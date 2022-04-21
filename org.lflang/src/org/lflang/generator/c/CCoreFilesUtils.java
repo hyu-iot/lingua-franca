@@ -120,7 +120,9 @@ public class CCoreFilesUtils {
                     "threaded/scheduler.h",
                     "threaded/scheduler_instance.h",
                     "threaded/scheduler_sync_tag_advance.c",
-                    "threaded/reactor_threaded.c"
+                    "threaded/reactor_threaded.c",
+                    scheduler == SchedulerOption.QS ? "threaded/instruction_QS.h" : "",
+                    scheduler == SchedulerOption.QS ? "threaded/static_schedule.h" : ""
                 ),
                 scheduler.getRelativePaths().stream().map(path -> "threaded/" + path.toString().replace("\\", "/"))
             ).collect(Collectors.toList()) :
