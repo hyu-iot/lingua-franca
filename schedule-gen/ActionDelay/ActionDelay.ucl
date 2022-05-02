@@ -1,0 +1,94 @@
+module main {
+
+    type task_t = enum { NULL, rxn_0, rxn_1, rxn_2, rxn_3 };
+    // Should be set to the number of reactions in the system.
+    type schedule_t = { task_t, task_t, task_t, task_t };
+    type workers_t = { schedule_t, schedule_t };
+
+    group indicies : integer = { 1, 2, 3, 4 };
+    group worker_indicies : integer = { 1, 2 };
+
+    // Assume all triggers are present.
+    group current_task_set : task_t = { rxn_0, rxn_1, rxn_2, rxn_3 };
+
+    var workers : workers_t;
+
+    // Get a task from a worker schedule.
+    define getT(s : schedule_t, i : integer) : task_t
+        = if (i == 1) then s._1 else 
+            (if (i == 2) then s._2 else
+                (if (i == 3) then s._3 else
+                    (if (i == 4) then s._4 else NULL)));
+
+    // Get a worker from workers.
+    define getW(workers : workers_t, w : integer) : schedule_t
+        = if (w == 1) then workers._1 else workers._2;
+
+    // Condense the two getters above.
+    define get(w, i : integer) : task_t
+        = getT(getW(workers, w), i);
+
+    /* Constraints */
+    // The schedules cannot be all empty.
+    axiom(finite_exists (w : integer) in worker_indicies ::
+        (finite_exists (i : integer) in indicies ::
+            get(w, i) != NULL));
+
+    // Each reaction only appears once.
+    axiom(finite_forall (w1: integer) in worker_indicies ::
+        (finite_forall (w2 : integer) in worker_indicies ::
+        (finite_forall (i : integer) in indicies ::
+        (finite_forall (j : integer) in indicies ::
+            (get(w1, i) != NULL)
+            ==> ((w1 == w2 && i == j) <==> 
+            (get(w1, i) == get(w2, j)))
+        ))));
+
+    // Each reaction appears at least once.
+    axiom(finite_forall (task : task_t) in current_task_set ::
+        (finite_exists (w : integer) in worker_indicies ::
+        (finite_exists (i : integer) in indicies ::
+            get(w, i) == task
+        )));
+
+    // Dependency graph (DAG) with reactions as nodes and
+    // precedence relations as edges.
+    define precedes(t1, t2 : task_t) : boolean
+    = (t1 == rxn_0 && t2 == rxn_1)
+        || (t1 == rxn_2 && t2 == rxn_3); 
+    
+    // The worker schedules need to respect the dependency graph.
+    axiom(finite_forall (w1: integer) in worker_indicies ::
+        (finite_forall (w2 : integer) in worker_indicies ::
+        (finite_forall (i : integer) in indicies ::
+        (finite_forall (j : integer) in indicies ::
+            (precedes(get(w1, i), get(w2, j))) ==> (i < j)
+        ))));
+
+    // Generate a satisfiable schedule.
+    property test : !(true);
+
+    // Optimization 1: load balancing
+    define count(s : schedule_t) : integer
+    = (if (getT(s, 1) != NULL) then 1 else 0)
+        + (if (getT(s, 2) != NULL) then 1 else 0)
+        + (if (getT(s, 3) != NULL) then 1 else 0)
+        + (if (getT(s, 4) != NULL) then 1 else 0);
+    var count_w1 : integer;
+    var count_w2 : integer;
+    axiom(count_w1 == count(getW(workers, 1)));
+    axiom(count_w2 == count(getW(workers, 2)));
+    var DIFF : integer;
+    define load_balanced() : boolean =
+        count_w1 == count_w2 + DIFF;
+
+    // Generate a satisfiable schedule with opti. 1.
+    property opt1 : !(load_balanced());
+
+    control {
+        v = unroll(0);
+        check;
+        print_results;
+        v.print_cex;
+    }
+}
