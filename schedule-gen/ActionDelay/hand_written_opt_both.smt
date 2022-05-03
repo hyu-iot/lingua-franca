@@ -1,6 +1,6 @@
-(declare-datatypes ((_enum_0 0)) (((NULL) (rxn_0) (rxn_1) (rxn_2) (rxn_3))))
-(declare-datatypes ((_tuple_0 0)) (((_tuple_0 (__f1 _enum_0) (__f2 _enum_0) (__f3 _enum_0) (__f4 _enum_0)))))
-(declare-datatypes ((_tuple_1 0)) (((_tuple_1 (__f1 _tuple_0) (__f2 _tuple_0)))))
+(declare-datatypes ((_enum_0 0)) (((NULL) (rxn_0) (rxn_1) (rxn_2) (rxn_3)))) ; define task_t
+(declare-datatypes ((_tuple_0 0)) (((_tuple_0 (__f1 _enum_0) (__f2 _enum_0) (__f3 _enum_0) (__f4 _enum_0))))) ; define schedule_t
+(declare-datatypes ((_tuple_1 0)) (((_tuple_1 (__f1 _tuple_0) (__f2 _tuple_0))))) ; define workers_t
 (declare-fun initial_1_workers () _tuple_1)
 (declare-fun initial_4_tasks_r2_num_workers () Int)
 (declare-fun initial_2_tasks_r1_num_workers () Int)
