@@ -157,6 +157,10 @@ public class CTriggerObjectsGenerator {
             isFederated,
             clockSyncIsOn
         ));
+
+        // TODO: Add reaction instances array.
+        // Need a way to associate each reaction with a unique integer id.
+
         code.pr(generateSchedulerInitializer(
             main,
             targetConfig

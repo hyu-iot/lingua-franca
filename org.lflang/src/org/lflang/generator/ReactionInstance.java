@@ -192,6 +192,11 @@ public class ReactionInstance extends NamedInstance<Reaction> {
     //////////////////////////////////////////////////////
     //// Public fields.
 
+    /**
+     * A unique integer ID for this reaction
+     */
+    public long reactionID;
+
     /** 
      * Indicates the chain this reaction is a part of. It is constructed
      * through a bit-wise or among all upstream chains. Each fork in the
