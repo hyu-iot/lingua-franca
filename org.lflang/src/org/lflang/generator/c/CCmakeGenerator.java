@@ -233,6 +233,9 @@ class CCmakeGenerator {
         }
         cMakeCode.newLine();
 
+        cMakeCode.pr("add_compile_definitions(SCHEDULER_QS)");
+        cMakeCode.newLine();
+
         // Add the install option
         cMakeCode.pr("install(");
         cMakeCode.indent();
