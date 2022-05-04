@@ -135,17 +135,20 @@ module main {
     var num_workers_sum : integer;
 
     // This macro acts as a switch for this optimization.
-    define locality() : boolean
+    define spatial_locality() : boolean
     = (num_workers_sum ==
         tasks_r1_num_workers
         + tasks_r2_num_workers
         + tasks_r3_num_workers);
 
     // Generate a satisfiable schedule with opti. 2.
-    property opt2 : !(locality());
+    property opt2 : !(spatial_locality());
 
     // Generate a satisfiable schedule with opt. 1 & 2.
-    property opt_both : !(load_balanced() && locality());
+    property opt_both : !(load_balanced() && spatial_locality());
+
+    // TODO: temporal locality
+    // TODO: reduce synchronization (harder to do because the model is not aware of synchronization.)
 
     control {
         v = unroll(0);
