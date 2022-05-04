@@ -82,6 +82,7 @@ module main {
     // Try to minimize the abs of DIFF. 
     // (minimize (abs initial_2_DIFF))
     // (get-objectives)
+    // FIXME: introduce weights.
     var DIFF : integer;
     define load_balanced() : boolean =
         count_w1 == count_w2 + DIFF;
@@ -89,7 +90,7 @@ module main {
     // Generate a satisfiable schedule with opti. 1.
     property opt1 : !(load_balanced());
 
-    //// Optimization 2: spatial & temporal locality
+    //// Optimization 2: spatial locality
     group tasks_r1 : task_t = { rxn_0 };
     group tasks_r2 : task_t = { rxn_1, rxn_2 };
     group tasks_r3 : task_t = { rxn_3 };
