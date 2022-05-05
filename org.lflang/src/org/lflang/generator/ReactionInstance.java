@@ -193,7 +193,8 @@ public class ReactionInstance extends NamedInstance<Reaction> {
     //// Public fields.
 
     /**
-     * A unique integer ID for this reaction
+     * A unique integer ID for identifying this reaction from
+     * all the other reactions in the program
      */
     public long reactionID;
 

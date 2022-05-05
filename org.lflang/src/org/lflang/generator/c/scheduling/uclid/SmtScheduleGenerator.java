@@ -26,6 +26,18 @@ THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package org.lflang.generator.c.scheduling.uclid;
 
+import com.microsoft.z3.*;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.List;
+
+import org.eclipse.xtext.xbase.lib.Exceptions;
 import org.lflang.ErrorReporter;
 import org.lflang.FileConfig;
 import org.lflang.Target;
@@ -35,6 +47,7 @@ import org.lflang.generator.GeneratorBase;
 import org.lflang.generator.TargetTypes;
 import org.lflang.lf.Action;
 import org.lflang.lf.VarRef;
+import org.lflang.util.LFCommand;
 
 /**
  * An SMT-based static schedule generator powered by Uclid5 and Z3
@@ -54,8 +67,80 @@ public class SmtScheduleGenerator extends GeneratorBase {
         super(fileConfig, errorReporter);
     }
 
+    private CodeBuilder generateUclidEncoding() {
+        var uclidCode = new CodeBuilder();
+
+        // The module declaration
+        uclidCode.pr("module main {");
+        uclidCode.indent();
+
+        // Dummy property (to be removed)
+        uclidCode.pr("property dummy : false;");
+
+        // The control block
+        uclidCode.pr(String.join("\n", 
+            "control {",
+            "    v = unroll(0);",
+            "    check;",
+            "    print_results;",
+            "    v.print_cex;",
+            "}"
+        ));
+
+        // End the module declaration
+        uclidCode.unindent();
+        uclidCode.pr("}");
+
+        return uclidCode;
+    }
+
     public CodeBuilder generateScheduleCode() {
         CodeBuilder scheduleCode = new CodeBuilder();
+
+        // Generate Uclid encoding
+        var tempFolder  = fileConfig.getSrcGenPath() + File.separator + "temp";
+        var uclidFile   = tempFolder + File.separator + "schedule.ucl";
+        var uclidCode   = this.generateUclidEncoding();
+        try {
+            uclidCode.writeToFile(uclidFile);
+        } catch (IOException e) {
+            Exceptions.sneakyThrow(e);
+        }
+
+        // Compile Uclid encoding to a SMT file.
+        /*
+        LFCommand cmdCompileUclid = LFCommand.get(
+            "uclid",
+            List.of(uclidFile, "-g", "smt"),
+            false,
+            Paths.get(tempFolder)
+        );
+        cmdCompileUclid.run();
+        */
+
+        // Load the generated file into a string
+        String smtFile = tempFolder + File.separator + "smt-property_dummy-v-0001.smt";
+        String smtCode = "";
+        try {
+            smtCode = Files.readString(Paths.get(smtFile), StandardCharsets.US_ASCII);
+        } catch (IOException e) {
+            Exceptions.sneakyThrow(e);
+        }
+        System.out.println(smtCode);
+
+        // Remove Uclid variable prefixes using regex.
+        smtCode = smtCode.replaceAll("initial_([0-9]+)_", ""); // or "initial_\\d+_", \\ escapes \.
+        System.out.println(smtCode);
+
+        // Load the SMT file into the Z3 Java binding.
+
+        // Add optimization objectives.
+
+        // Solve for results.
+
+        // Generate preambles (everything other than the schedule in the .h file)
+
+        // Generate executable worker schedules using the custom instruction set.
 
         return scheduleCode;
     }
