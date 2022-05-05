@@ -157,10 +157,11 @@ public class CTriggerObjectsGenerator {
             isFederated,
             clockSyncIsOn
         ));
-
-        // TODO: Add reaction instances array.
-        // Need a way to associate each reaction with a unique integer id.
-
+        code.pr(generateReactionInstanceList( 
+            federate, 
+            main,
+            isFederated
+        ));
         code.pr(generateSchedulerInitializer(
             main,
             targetConfig
@@ -169,7 +170,6 @@ public class CTriggerObjectsGenerator {
         code.pr("}\n");
         return code.toString();
     }
-
     /**
     * Generate code to initialize the scheduler for the threaded C runtime.
     */
@@ -191,7 +191,8 @@ public class CTriggerObjectsGenerator {
             "    {" + numReactionsPerLevelJoined + "};",
             "sched_params_t sched_params = (sched_params_t) {",
             "                        .num_reactions_per_level = &num_reactions_per_level[0],",
-            "                        .num_reactions_per_level_size = (size_t) "+numReactionsPerLevel.length+"};",
+            "                        .num_reactions_per_level_size = (size_t) "+numReactionsPerLevel.length+",",
+            "                        .reaction_instances = _lf_reaction_instances};",
             "lf_sched_init(",
             "    (size_t)_lf_number_of_workers,",
             "    &sched_params",
@@ -369,7 +370,9 @@ public class CTriggerObjectsGenerator {
         var temp = new CodeBuilder();
         temp.pr("// Set reaction priorities for " + reactor);
         temp.startScopedBlock(reactor, currentFederate, isFederated, true);
+
         for (ReactionInstance r : reactor.reactions) {
+
             if (currentFederate.contains(r.getDefinition())) {
                 foundOne = true;
                 // The most common case is that all runtime instances of the
@@ -381,6 +384,7 @@ public class CTriggerObjectsGenerator {
                     for (Integer l : levels) {
                         level = l;
                     }
+                    temp.pr("//levels.size() == 1");
                     // xtend doesn't support bitwise operators...
                     var indexValue = r.deadline.toNanoSeconds() << 16 | level;
                     var reactionIndex = "0x" + Long.toString(indexValue, 16) + "LL";
@@ -416,6 +420,41 @@ public class CTriggerObjectsGenerator {
             builder.pr(epilog.toString());
         }
         return foundOne;
+    }
+private static String generateReactionInstanceList(        
+    FederateInstance currentFederate,
+        ReactorInstance reactor,
+        boolean isFederated) {
+    var code = new CodeBuilder();
+    int reactionId = 0;
+    var numReactionsPerLevel = reactor.assignLevels().getNumReactionsPerLevel();
+    code.pr( "reaction_t **_lf_reaction_instances = (reaction_t**) calloc("+numReactionsPerLevel.length+", sizeof(reaction_t*));");
+    generateReactionInstances(currentFederate,reactor, isFederated, code, reactionId);
+    return code.toString();
+}
+private static int generateReactionInstances(
+        FederateInstance currentFederate,
+        ReactorInstance reactor,
+        boolean isFederated,
+        CodeBuilder code,
+        int reactionId
+    ){
+        // if(!reactor.reactions.isEmpty()){
+        //     code.pr("//reactorreactions are not empty");
+        // }
+        // else{
+        //     code.pr("//reactor.reactions are not empty");
+        // }
+        for (ReactionInstance r : reactor.reactions) {
+            code.pr(String.join("", "_lf_reaction_instances["+reactionId+"] = ", "&", CUtil.reactionRef(r), ";"));
+            reactionId +=1;
+        }
+         for (ReactorInstance child : reactor.children) {
+            if (currentFederate.contains(child)) {
+                 reactionId = generateReactionInstances(currentFederate, child, isFederated, code, reactionId);
+            }
+        }
+        return reactionId;
     }
 
     /**
