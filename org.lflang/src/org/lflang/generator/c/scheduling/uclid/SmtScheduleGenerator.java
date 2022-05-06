@@ -47,6 +47,7 @@ import org.lflang.generator.GeneratorBase;
 import org.lflang.generator.TargetTypes;
 import org.lflang.lf.Action;
 import org.lflang.lf.VarRef;
+import org.lflang.util.FileUtil;
 import org.lflang.util.LFCommand;
 
 /**
@@ -84,6 +85,11 @@ public class SmtScheduleGenerator extends GeneratorBase {
         uclidCode.unindent();
         uclidCode.pr("}");
 
+        // Variables for optimization
+        uclidCode.pr("// Variables for optimization");
+        uclidCode.pr("var num_workers_sum : integer;");
+        uclidCode.pr("var DIFF : integer;");
+
         // Dummy property (to be removed)
         uclidCode.pr("property dummy : false;");
 
@@ -107,8 +113,15 @@ public class SmtScheduleGenerator extends GeneratorBase {
     public CodeBuilder generateScheduleCode() {
         CodeBuilder scheduleCode = new CodeBuilder();
 
-        // Generate Uclid encoding
+        // Create temp folder
         var tempFolder  = fileConfig.getSrcGenPath() + File.separator + "temp";
+        // try {
+        //     FileUtil.deleteDirectory(Paths.get(tempFolder));
+        // } catch (IOException e) {
+        //     Exceptions.sneakyThrow(e);
+        // }
+
+        // Generate Uclid encoding
         var uclidFile   = tempFolder + File.separator + "schedule.ucl";
         var uclidCode   = this.generateUclidEncoding();
         try {
@@ -127,7 +140,8 @@ public class SmtScheduleGenerator extends GeneratorBase {
         cmdCompileUclid.run();
 
         // Load the generated file into a string
-        String smtFile = tempFolder + File.separator + "smt-property_dummy-v-0001.smt";
+        String smtFile = tempFolder + File.separator
+            + "smt-property_dummy-v-0001.smt";
         String smtCode = "";
         try {
             smtCode = Files.readString(Paths.get(smtFile), StandardCharsets.US_ASCII);
@@ -138,18 +152,30 @@ public class SmtScheduleGenerator extends GeneratorBase {
 
         // Remove Uclid variable prefixes using regex.
         smtCode = smtCode.replaceAll("initial_([0-9]+)_", ""); // or "initial_\\d+_", \\ escapes \.
+        smtCode = smtCode.replaceAll("\\(check-sat\\)", "");
+        smtCode = smtCode.replaceAll("\\(get-info :all-statistics\\)", "");
         System.out.println(smtCode);
+
+        // Add optimization objectives.
+        smtCode += String.join("\n", 
+            "(minimize (abs num_workers_sum))",
+            "(minimize (abs DIFF))"
+        );
+        smtCode += String.join("\n", 
+            "(check-sat)",
+            "(get-info :all-statistics)",
+            "(get-model)",
+            "(get-objectives)"
+        );
 
         // Load the SMT file into the Z3 Java binding.
         Context ctx = new Context();
         Solver s = ctx.mkSolver();
         s.fromString(smtCode);
-        Status sat = s.check();
-        System.out.println(sat);
-
-        // Add optimization objectives.
 
         // Solve for results.
+        Status sat = s.check();
+        System.out.println(sat);
 
         // Generate preambles (everything other than the schedule in the .h file)
 
