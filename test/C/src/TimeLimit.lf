@@ -10,7 +10,9 @@
 // This translates to 31 nanoseconds per reaction invocation.
 target C {
     flags: "-O2",
-    fast: true
+    fast: true,
+	scheduler: QS,
+	workers: 2
 };
 reactor Clock(offset:time(0), period:time(1 sec)) {
     output y:int;

@@ -6,7 +6,7 @@ static const int reaction_count = 4;
 // Number of semaphores needed
 static const int num_semaphores = 0;
 
-// Schedule 1 (most generic): all signals present.
+
 static const inst_t s1_w1[] = { {.inst='e', .op=0 }, {.inst='e', .op=1 }, {.inst='s', .op=0 } };
 static const inst_t s1_w2[] = { {.inst='e', .op=2 }, {.inst='e', .op=3 }, {.inst='s', .op=0 } };
 static const inst_t s1_w3[] = { {.inst='s', .op=0 } };

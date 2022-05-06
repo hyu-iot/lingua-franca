@@ -42,6 +42,8 @@ public class CTriggerObjectsGenerator {
     /**
      * Generate the _lf_initialize_trigger_objects function for 'federate'.
      */
+    public static int reactionId = 0;
+    public static int reactionNum = 0;
     public static String generateInitializeTriggerObjects(
         FederateInstance federate,
         ReactorInstance main,
@@ -405,6 +407,7 @@ public class CTriggerObjectsGenerator {
                         CUtil.reactionRef(r)+".index = ("+reactionDeadline+" << 16) | "+r.uniqueID()+"_levels["+CUtil.runtimeIndex(r.getParent())+"];"
                     ));
                 }
+                reactionNum +=1;
             }
         }
         for (ReactorInstance child : reactor.children) {
@@ -428,8 +431,8 @@ private static String generateReactionInstanceList(
     var code = new CodeBuilder();
     int reactionId = 0;
     var numReactionsPerLevel = reactor.assignLevels().getNumReactionsPerLevel();
-    code.pr( "reaction_t **_lf_reaction_instances = (reaction_t**) calloc("+numReactionsPerLevel.length+", sizeof(reaction_t*));");
-    generateReactionInstances(currentFederate,reactor, isFederated, code, reactionId);
+    code.pr( "reaction_t **_lf_reaction_instances = (reaction_t**) calloc("+reactionNum+", sizeof(reaction_t*));");
+    generateReactionInstances(currentFederate,reactor, isFederated, code);
     return code.toString();
 }
 private static int generateReactionInstances(
