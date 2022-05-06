@@ -74,6 +74,16 @@ public class SmtScheduleGenerator extends GeneratorBase {
         uclidCode.pr("module main {");
         uclidCode.indent();
 
+        // Declare the set of reactions.
+        uclidCode.pr("type task_t = enum {");
+        uclidCode.indent();
+        uclidCode.pr("NULL");
+        // for (var rxn : this.main.reactionInstanceGraph.nodes()) {
+        //     uclidCode.pr(rxn.toString());
+        // }
+        uclidCode.unindent();
+        uclidCode.pr("}");
+
         // Dummy property (to be removed)
         uclidCode.pr("property dummy : false;");
 
@@ -108,7 +118,6 @@ public class SmtScheduleGenerator extends GeneratorBase {
         }
 
         // Compile Uclid encoding to a SMT file.
-        /*
         LFCommand cmdCompileUclid = LFCommand.get(
             "uclid",
             List.of(uclidFile, "-g", "smt"),
@@ -116,7 +125,6 @@ public class SmtScheduleGenerator extends GeneratorBase {
             Paths.get(tempFolder)
         );
         cmdCompileUclid.run();
-        */
 
         // Load the generated file into a string
         String smtFile = tempFolder + File.separator + "smt-property_dummy-v-0001.smt";
@@ -133,6 +141,11 @@ public class SmtScheduleGenerator extends GeneratorBase {
         System.out.println(smtCode);
 
         // Load the SMT file into the Z3 Java binding.
+        Context ctx = new Context();
+        Solver s = ctx.mkSolver();
+        s.fromString(smtCode);
+        Status sat = s.check();
+        System.out.println(sat);
 
         // Add optimization objectives.
 
