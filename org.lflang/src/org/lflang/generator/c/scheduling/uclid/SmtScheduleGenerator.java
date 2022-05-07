@@ -37,6 +37,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream;
 
 import org.eclipse.xtext.xbase.lib.Exceptions;
 import org.lflang.ErrorReporter;
@@ -127,11 +128,15 @@ public class SmtScheduleGenerator {
         uclidCode.pr("};");
 
         // Define groups.
-        uclidCode.pr("// Define groups.");
-        uclidCode.pr("group indices : integer = {");
-        uclidCode.indent();
-        uclidCode.unindent();
-        uclidCode.pr("};");
+        // uclidCode.pr("// Define groups.");
+        // uclidCode.pr("group indices : integer = {");
+        // uclidCode.indent();
+        // uclidCode.pr(String.join(", ",
+        //     IntStream.range(0, this.reactionInstanceGraph.nodeCount() - 1)
+        //     .boxed()
+        //     .collect(Collectors.toList())));
+        // uclidCode.unindent();
+        // uclidCode.pr("};");
 
         // Variables for optimization
         uclidCode.pr("// Declare variables for optimization.");
