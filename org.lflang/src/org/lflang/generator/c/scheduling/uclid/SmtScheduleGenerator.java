@@ -35,6 +35,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 
 import org.eclipse.xtext.xbase.lib.Exceptions;
@@ -44,6 +45,9 @@ import org.lflang.Target;
 import org.lflang.TargetConfig;
 import org.lflang.generator.CodeBuilder;
 import org.lflang.generator.GeneratorBase;
+import org.lflang.generator.ReactionInstance;
+import org.lflang.generator.ReactionInstanceGraph;
+import org.lflang.generator.ReactorInstance;
 import org.lflang.generator.TargetTypes;
 import org.lflang.lf.Action;
 import org.lflang.lf.VarRef;
@@ -55,17 +59,36 @@ import org.lflang.util.LFCommand;
  * 
  * @author {Shaokai Lin <shaokai@berkeley.edu>}
  */
-public class SmtScheduleGenerator extends GeneratorBase {
+public class SmtScheduleGenerator {
     ////////////////////////////////////////////
     //// Protected fields
-    
+
+    /** The current file configuration. */
+    protected FileConfig fileConfig;
+
+    /** A error reporter for reporting any errors or warnings during the code generation */
+    public ErrorReporter errorReporter;
+
+    /** The main (top-level) reactor instance. */
+    public ReactorInstance main;
+
+    /** Reaction instance graph that contains the set of all reactions in the LF program */
+    public ReactionInstanceGraph reactionInstanceGraph;
+
+    /** The target properties of the LF program */
+    public TargetConfig targetConfig;
+
     /** The main place to put generated code. */
     protected CodeBuilder code = new CodeBuilder();
 
     ////////////////////////////////////////////
     //// Private fields
-    public SmtScheduleGenerator(FileConfig fileConfig, ErrorReporter errorReporter) {
-        super(fileConfig, errorReporter);
+    public SmtScheduleGenerator(FileConfig fileConfig, ErrorReporter errorReporter, ReactorInstance main, TargetConfig targetConfig) {
+        this.fileConfig = fileConfig;
+        this.errorReporter = errorReporter;
+        this.main = main;
+        this.reactionInstanceGraph = new ReactionInstanceGraph(this.main, false);
+        this.targetConfig = targetConfig;
     }
 
     private CodeBuilder generateUclidEncoding() {
@@ -76,17 +99,35 @@ public class SmtScheduleGenerator extends GeneratorBase {
         uclidCode.indent();
 
         // Declare the set of reactions.
+        uclidCode.pr("// Declare the set of reactions.");
         uclidCode.pr("type task_t = enum {");
         uclidCode.indent();
+        for (var rxn : this.reactionInstanceGraph.nodes()) {
+            // Replace "." and " " with "_".
+            uclidCode.pr(rxn.getFullName().replaceAll("(\\.| )", "_") + ",");
+        }
         uclidCode.pr("NULL");
-        // for (var rxn : this.main.reactionInstanceGraph.nodes()) {
-        //     uclidCode.pr(rxn.toString());
-        // }
         uclidCode.unindent();
-        uclidCode.pr("}");
+        uclidCode.pr("};");
+
+        // Declare worker schedule.
+        uclidCode.pr("// Declare worker schedule.");
+        uclidCode.pr("type schedule_t = {");
+        uclidCode.indent();
+        uclidCode.pr(String.join(", ", Collections.nCopies(this.reactionInstanceGraph.nodeCount(), "task_t")));
+        uclidCode.unindent();
+        uclidCode.pr("};");
+
+        // Declare workers.
+        uclidCode.pr("// Declare workers.");
+        uclidCode.pr("type workers_t = {");
+        uclidCode.indent();
+        uclidCode.pr(String.join(", ", Collections.nCopies(this.targetConfig.workers, "schedule_t")));
+        uclidCode.unindent();
+        uclidCode.pr("};");
 
         // Variables for optimization
-        uclidCode.pr("// Variables for optimization");
+        uclidCode.pr("// Declare variables for optimization.");
         uclidCode.pr("var num_workers_sum : integer;");
         uclidCode.pr("var DIFF : integer;");
 
@@ -115,11 +156,11 @@ public class SmtScheduleGenerator extends GeneratorBase {
 
         // Create temp folder
         var tempFolder  = fileConfig.getSrcGenPath() + File.separator + "temp";
-        // try {
-        //     FileUtil.deleteDirectory(Paths.get(tempFolder));
-        // } catch (IOException e) {
-        //     Exceptions.sneakyThrow(e);
-        // }
+        try {
+            FileUtil.deleteDirectory(Paths.get(tempFolder));
+        } catch (IOException e) {
+            Exceptions.sneakyThrow(e);
+        }
 
         // Generate Uclid encoding
         var uclidFile   = tempFolder + File.separator + "schedule.ucl";
@@ -176,44 +217,18 @@ public class SmtScheduleGenerator extends GeneratorBase {
         // Solve for results.
         Status sat = s.check();
         System.out.println(sat);
+        Model model;
+        if (sat == Status.SATISFIABLE) {
+            model = s.getModel();
+            System.out.println(model);
+        } else {
+            Exceptions.sneakyThrow(new Exception("Error: No satisfiable schedule is found."));
+        }
 
         // Generate preambles (everything other than the schedule in the .h file)
 
         // Generate executable worker schedules using the custom instruction set.
 
         return scheduleCode;
-    }
-
-    ////////////////////////////////////////////
-    //// Public methods.            
-    /** Returns the Target enum for this generator */
-    @Override
-    public Target getTarget() {
-        return Target.C;
-    }
-
-    @Override
-    public TargetTypes getTargetTypes() {
-        throw new UnsupportedOperationException("TODO: auto-generated method stub");
-    }
-
-    @Override
-    public String getNetworkBufferType() {
-        throw new UnsupportedOperationException("TODO: auto-generated method stub");
-    }
-
-    @Override
-    public String generateDelayGeneric() {
-        throw new UnsupportedOperationException("TODO: auto-generated method stub");
-    }
-
-    @Override
-    public String generateDelayBody(Action action, VarRef port) { 
-        throw new UnsupportedOperationException("TODO: auto-generated method stub");
-    }
-
-    @Override
-    public String generateForwardBody(Action action, VarRef port) {
-        throw new UnsupportedOperationException("TODO: auto-generated method stub");
     }
 }

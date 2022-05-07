@@ -494,6 +494,11 @@ public class ReactionInstance extends NamedInstance<Reaction> {
         public ReactionInstance getReaction() {
             return ReactionInstance.this;
         }
+
+        public String getFullName() {
+            return ReactionInstance.this.toString();
+        }
+
         @Override
         public String toString() {
             String result = ReactionInstance.this + "(level: " + level;

@@ -577,9 +577,13 @@ public class CGenerator extends GeneratorBase {
                     dockerGenerator.fromData(lfModuleName, federate.name, fileConfig));
             }
 
+            System.out.println("Checking main instance in CGenerator.java.");
+            System.out.println(this.main);
+            System.out.println(main);
+
             // Generate schedule.h if QS scheduler is used.
             if (targetConfig.schedulerType == SchedulerOption.QS) {
-                var scheduleGenerator = new SmtScheduleGenerator(fileConfig, errorReporter);
+                var scheduleGenerator = new SmtScheduleGenerator(fileConfig, errorReporter, main, targetConfig);
                 var scheduleFile = fileConfig.getSrcGenPath() + File.separator + "schedule.h";
                 var scheduleCode = scheduleGenerator.generateScheduleCode();
                 try {

@@ -60,18 +60,23 @@ public class ReactionInstanceGraph extends PrecedenceGraph<ReactionInstance.Runt
      * Create a new graph by traversing the maps in the named instances 
      * embedded in the hierarchy of the program. 
      */
-    public ReactionInstanceGraph(ReactorInstance main) {
+    public ReactionInstanceGraph(ReactorInstance main, boolean detectCycles) {
         this.main = main;
+        this.detectCycles = detectCycles;
         rebuild();
     }
 
     ///////////////////////////////////////////////////////////
     //// Public fields
 
-    /**
-     * The main reactor instance that this graph is associated with.
-     */
+    /** The main reactor instance that this graph is associated with. */
     public final ReactorInstance main;
+
+    /** 
+     * Whether this ReactionInstanceGraph is built for detecting cycles,
+     * which involves removing nodes from the graph.
+     */
+    public final boolean detectCycles;
     
     ///////////////////////////////////////////////////////////
     //// Public methods
@@ -83,14 +88,16 @@ public class ReactionInstanceGraph extends PrecedenceGraph<ReactionInstance.Runt
     public void rebuild() {
         this.clear();
         addNodesAndEdges(main);
-        // Assign a level to each reaction. 
-        // If there are cycles present in the graph, it will be detected here.
-        assignLevels();
-        if (nodeCount() != 0) {
-            // The graph has cycles.
-            // main.reporter.reportError("Reactions form a cycle! " + toString());
-            // Do not throw an exception so that cycle visualization can proceed.
-            // throw new InvalidSourceException("Reactions form a cycle!");
+        if (this.detectCycles) { 
+            // Assign a level to each reaction. 
+            // If there are cycles present in the graph, it will be detected here.
+            assignLevels();
+            if (nodeCount() != 0) {
+                // The graph has cycles.
+                // main.reporter.reportError("Reactions form a cycle! " + toString());
+                // Do not throw an exception so that cycle visualization can proceed.
+                // throw new InvalidSourceException("Reactions form a cycle!");
+            }
         }
     }
     
@@ -291,7 +298,7 @@ public class ReactionInstanceGraph extends PrecedenceGraph<ReactionInstance.Runt
                 }
             }
             
-            // Remove visited origin.
+            // (IMPORTANT) Remove visited origin.
             removeNode(origin);
 
             // Update numReactionsPerLevel info
