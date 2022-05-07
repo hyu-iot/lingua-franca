@@ -126,6 +126,13 @@ public class SmtScheduleGenerator {
         uclidCode.unindent();
         uclidCode.pr("};");
 
+        // Define groups.
+        uclidCode.pr("// Define groups.");
+        uclidCode.pr("group indices : integer = {");
+        uclidCode.indent();
+        uclidCode.unindent();
+        uclidCode.pr("};");
+
         // Variables for optimization
         uclidCode.pr("// Declare variables for optimization.");
         uclidCode.pr("var num_workers_sum : integer;");
