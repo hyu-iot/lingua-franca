@@ -147,7 +147,7 @@ public class SmtScheduleGenerator {
         uclidCode.pr("group task_indices : integer = {");
         uclidCode.indent();
         uclidCode.pr(String.join(", ",
-            IntStream.range(0, this.reactionInstanceGraph.nodeCount() - 1)
+            IntStream.range(0, this.reactionInstanceGraph.nodeCount())
             .boxed()
             .collect(Collectors.toList())
             .stream()
@@ -163,7 +163,7 @@ public class SmtScheduleGenerator {
         uclidCode.pr("group worker_indices : integer = {");
         uclidCode.indent();
         uclidCode.pr(String.join(", ",
-            IntStream.range(0, this.targetConfig.workers - 1)
+            IntStream.range(0, this.targetConfig.workers)
             .boxed()
             .collect(Collectors.toList())
             .stream()
@@ -290,14 +290,56 @@ public class SmtScheduleGenerator {
         uclidCode.pr(";");
         uclidCode.pr("");
 
-        // Variables for optimization
-        uclidCode.pr("// Declare variables for optimization.");
-        uclidCode.pr("var num_workers_sum : integer;");
-        uclidCode.pr("var DIFF : integer;");
+        // The worker schedules need to respect the dependency graph.
+        uclidCode.pr("// The worker schedules need to respect the dependency graph.");
+        uclidCode.pr(String.join("\n", 
+            "axiom(finite_forall (w1: integer) in worker_indices ::",
+            "    (finite_forall (w2 : integer) in worker_indices ::",
+            "    (finite_forall (i : integer) in task_indices ::",
+            "    (finite_forall (j : integer) in task_indices ::",
+            "        (precedes(get(w1, i), get(w2, j))) ==> (i < j)",
+            "    ))));"
+        ));
         uclidCode.pr("");
 
-        // Dummy property (to be removed)
-        uclidCode.pr("property dummy : false;");
+        /*****************
+         * Optimizations *
+         *****************/
+        uclidCode.pr(String.join("\n", 
+            "/*****************",
+            " * Optimizations *",
+            " *****************/"
+        ));
+        uclidCode.pr("");
+
+        // Optimization 1: load balancing
+        uclidCode.pr("// Optimization 1: load balancing");
+        uclidCode.pr("define count(s : schedule_t) : integer = 0");
+        uclidCode.indent();
+        for (var i = 0; i < this.reactionInstanceGraph.nodeCount(); i++) {
+            uclidCode.pr("+ (if (getT(s, " + i + ") != NULL) then 1 else 0)");
+        }
+        uclidCode.unindent();
+        uclidCode.pr(";");
+        uclidCode.pr("");
+
+        // Declare variables that count the number of
+        // non-NULL reactions for each worker schedule.
+        uclidCode.pr(String.join("\n", 
+            "// Declare variables that count the number of",
+            "// non-NULL reactions for each worker schedule."
+        ));
+        for (var i = 0; i < this.targetConfig.workers; i++) {
+            uclidCode.pr("var count_w" + i + " : integer;");
+            uclidCode.pr("axiom(count_w" + i + " == count(getW(workers, " + i + ")));");
+        }
+        uclidCode.pr("");
+
+        // Optimization 2: spatial locality
+        uclidCode.pr("// TODO: Optimization 2: spatial locality");
+
+        // Property
+        uclidCode.pr("property prop : !(true);");
         uclidCode.pr("");
 
         // The control block
@@ -348,37 +390,56 @@ public class SmtScheduleGenerator {
 
         // Load the generated file into a string
         String smtFile = tempFolder + File.separator
-            + "smt-property_dummy-v-0001.smt";
-        String smtCode = "";
+            + "smt-property_prop-v-0001.smt";
+        String smtStr = "";
         try {
-            smtCode = Files.readString(Paths.get(smtFile), StandardCharsets.US_ASCII);
+            smtStr = Files.readString(Paths.get(smtFile), StandardCharsets.US_ASCII);
         } catch (IOException e) {
             Exceptions.sneakyThrow(e);
         }
-        System.out.println(smtCode);
+        System.out.println(smtStr);
 
         // Remove Uclid variable prefixes using regex.
-        smtCode = smtCode.replaceAll("initial_([0-9]+)_", ""); // or "initial_\\d+_", \\ escapes \.
-        smtCode = smtCode.replaceAll("\\(check-sat\\)", "");
-        smtCode = smtCode.replaceAll("\\(get-info :all-statistics\\)", "");
-        System.out.println(smtCode);
+        smtStr = smtStr.replaceAll("initial_([0-9]+)_", ""); // or "initial_\\d+_", \\ escapes \.
+        smtStr = smtStr.replaceAll("\\(check-sat\\)", "");
+        smtStr = smtStr.replaceAll("\\(get-info :all-statistics\\)", "");
+        System.out.println(smtStr);
 
-        // Add optimization objectives.
-        smtCode += String.join("\n", 
-            "(minimize (abs num_workers_sum))",
-            "(minimize (abs DIFF))"
-        );
-        smtCode += String.join("\n", 
+        // Add optimization objectives for load balancing.
+        //
+        // FIXME: This just divides the number of tasks,
+        // but might not indicate parallelism.
+        // For parallelism, we need to maximize the number
+        // of concurrent tasks, i.e. the sum of non-NULL
+        // reactions for a particular task index across all workers.
+        for (var i = 0; i < this.targetConfig.workers; i++) {
+            for (var j = i; j < this.targetConfig.workers; j++) {
+                if (j == i) continue;
+                smtStr += "(minimize (abs (- count_w" + i + " count_w" + j + ")))";
+            }
+        }
+
+        // Add directives.
+        smtStr += String.join("\n", 
             "(check-sat)",
             "(get-info :all-statistics)",
             "(get-model)",
             "(get-objectives)"
         );
 
-        // Load the SMT file into the Z3 Java binding.
+        // Write SMT back to file (for debugging)
+        var smtCode = new CodeBuilder();
+        smtCode.pr(smtStr);
+        try {
+            smtCode.writeToFile(smtFile);
+        } catch (IOException e) {
+            Exceptions.sneakyThrow(e);
+        }
+
+        // Load the SMT string into the Z3 Java binding.
         Context ctx = new Context();
         Solver s = ctx.mkSolver();
-        s.fromString(smtCode);
+        s.fromString(smtStr);
 
         // Solve for results.
         Status sat = s.check();
