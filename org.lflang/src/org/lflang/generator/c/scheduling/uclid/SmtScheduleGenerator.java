@@ -359,9 +359,7 @@ public class SmtScheduleGenerator {
         return uclidCode;
     }
 
-    public CodeBuilder generateScheduleCode() {
-        CodeBuilder scheduleCode = new CodeBuilder();
-
+    public Model generateSmtScheduleModel() {
         // Create temp folder
         var tempFolder  = fileConfig.getSrcGenPath() + File.separator + "temp";
         try {
@@ -397,13 +395,13 @@ public class SmtScheduleGenerator {
         } catch (IOException e) {
             Exceptions.sneakyThrow(e);
         }
-        System.out.println(smtStr);
+        // System.out.println(smtStr);
 
         // Remove Uclid variable prefixes using regex.
         smtStr = smtStr.replaceAll("initial_([0-9]+)_", ""); // or "initial_\\d+_", \\ escapes \.
         smtStr = smtStr.replaceAll("\\(check-sat\\)", "");
         smtStr = smtStr.replaceAll("\\(get-info :all-statistics\\)", "");
-        System.out.println(smtStr);
+        // System.out.println(smtStr);
 
         // Add optimization objectives for load balancing.
         //
@@ -443,16 +441,55 @@ public class SmtScheduleGenerator {
 
         // Solve for results.
         Status sat = s.check();
-        System.out.println(sat);
-        Model model;
+        // System.out.println(sat);
+        Model model = null;
         if (sat == Status.SATISFIABLE) {
             model = s.getModel();
-            System.out.println(model);
+            // System.out.println(model);
         } else {
             Exceptions.sneakyThrow(new Exception("Error: No satisfiable schedule is found."));
         }
 
-        // Generate preambles (everything other than the schedule in the .h file)
+        return model;
+    }
+
+    public CodeBuilder generateScheduleCode() {
+        CodeBuilder scheduleCode = new CodeBuilder();
+
+        // This SMT model contains a set of worker schedules.
+        Model model = generateSmtScheduleModel();
+        System.out.println(model);
+
+        FuncDecl[] decls = model.getDecls();
+        FuncDecl workersDecl = null;
+        for (var i = 0; i < decls.length; i++) {
+            System.out.println(decls[i].getName());
+            if (decls[i].getName().toString().equals("workers")) {
+                workersDecl = decls[i];
+                break;
+            }
+        }
+        System.out.println(workersDecl);
+
+        Sort[] sorts = workersDecl.getDomain();
+        System.out.println("sorts length: " + sorts.length);
+        for (var i = 0; i < sorts.length; i++) {
+            System.out.println(sorts[i].getName());
+        }
+
+        // Parameter[] params = workersDecl.getParameters();
+        // System.out.println("params length: " + params.length);
+        // for (var i = 0; i < params.length; i++) {
+        //     System.out.println(params[i].getName());
+        // }
+
+        // FuncDecl[] constDecls = model.getConstDecls();
+        // System.out.println("constDecls length: " + constDecls.length);
+        // for (var i = 0; i < constDecls.length; i++) {
+        //     System.out.println(constDecls[i]);
+        // }
+
+        // Generate preambles (everything other than the schedule in the .h file).
 
         // Generate executable worker schedules using the custom instruction set.
 
