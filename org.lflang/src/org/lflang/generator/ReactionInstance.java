@@ -495,6 +495,10 @@ public class ReactionInstance extends NamedInstance<Reaction> {
             return ReactionInstance.this;
         }
 
+        public long getReactionID() {
+            return ReactionInstance.this.reactionID;
+        }
+
         public String getFullName() {
             return ReactionInstance.this.toString();
         }

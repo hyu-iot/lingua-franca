@@ -35,8 +35,11 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.regex.MatchResult;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -117,7 +120,7 @@ public class SmtScheduleGenerator {
         uclidCode.indent();
         for (var rxn : this.reactionInstanceGraph.nodes()) {
             // Replace "." and " " with "_".
-            uclidCode.pr(rxn.getFullName().replaceAll("(\\.| )", "_") + ",");
+            uclidCode.pr("rxn_" + rxn.getReactionID() + ", //" + rxn.getFullName());
         }
         uclidCode.pr("NULL");
         uclidCode.unindent();
@@ -182,7 +185,7 @@ public class SmtScheduleGenerator {
         uclidCode.indent();
         for (var rxn : this.reactionInstanceGraph.nodes()) {
             // Replace "." and " " with "_".
-            uclidCode.pr(rxn.getFullName().replaceAll("(\\.| )", "_") + ",");
+            uclidCode.pr("rxn_" + rxn.getReactionID() + ", //" + rxn.getFullName());
         }
         uclidCode.pr("NULL");
         uclidCode.unindent();
@@ -282,8 +285,10 @@ public class SmtScheduleGenerator {
         for (var rxn : this.reactionInstanceGraph.nodes()) {
             var downstream = this.reactionInstanceGraph.getDownstreamAdjacentNodes(rxn);
             for (var ds : downstream) {
-                uclidCode.pr("|| (t1 == " + rxn.getFullName().replaceAll("(\\.| )", "_")
-                    + " && t2 == " + ds.getFullName().replaceAll("(\\.| )", "_") + ")");
+                uclidCode.pr("|| (t1 == " + "rxn_" + rxn.getReactionID()
+                    + " && t2 == " + "rxn_" + ds.getReactionID() + ")"
+                    + " // " + rxn.getFullName().replaceAll("(\\.| )", "_")
+                    + " -> " + ds.getFullName().replaceAll("(\\.| )", "_"));
             }
         }
         uclidCode.unindent();
@@ -459,37 +464,46 @@ public class SmtScheduleGenerator {
         // This SMT model contains a set of worker schedules.
         Model model = generateSmtScheduleModel();
         System.out.println(model);
+        String modelStr = model.toString();
 
-        FuncDecl[] decls = model.getDecls();
-        FuncDecl workersDecl = null;
-        for (var i = 0; i < decls.length; i++) {
-            System.out.println(decls[i].getName());
-            if (decls[i].getName().toString().equals("workers")) {
-                workersDecl = decls[i];
-                break;
+        // Use regex to parse generated schedules.
+        String[] matches = Pattern.compile("\\(_tuple_0 ([A-Za-z0-9\\_\\s\\n]+)\\)")
+                            .matcher(modelStr)
+                            .results()
+                            .map(MatchResult::group)
+                            .toArray(String[]::new);
+
+        // Process the matched strings.
+        List<String[]> schedules = new ArrayList<String[]>();
+        for (var i = 0; i < matches.length; i++) {
+            System.out.println(matches[i]);
+            schedules.add(matches[i].replaceAll("(\\(|\\)|_tuple_0 |NULL)", "")
+                                    .split("\\s+"));
+        }
+        for (var schedule : schedules) {
+            System.out.println("Schedule: " + schedule.length);
+            for (var i = 0; i < schedule.length; i++) {
+                System.out.println(schedule[i]);
             }
         }
-        System.out.println(workersDecl);
 
-        Sort[] sorts = workersDecl.getDomain();
-        System.out.println("sorts length: " + sorts.length);
-        for (var i = 0; i < sorts.length; i++) {
-            System.out.println(sorts[i].getName());
-        }
-
-        // Parameter[] params = workersDecl.getParameters();
-        // System.out.println("params length: " + params.length);
-        // for (var i = 0; i < params.length; i++) {
-        //     System.out.println(params[i].getName());
-        // }
-
-        // FuncDecl[] constDecls = model.getConstDecls();
-        // System.out.println("constDecls length: " + constDecls.length);
-        // for (var i = 0; i < constDecls.length; i++) {
-        //     System.out.println(constDecls[i]);
-        // }
+        // Calculate the number of semaphores needed.
+        int num_semaphores = 0;
 
         // Generate preambles (everything other than the schedule in the .h file).
+        scheduleCode.pr("/* Auto-generated schedule */");
+        scheduleCode.pr("// The total number of reactions");
+        scheduleCode.pr("static const int reaction_count = "
+                        + this.reactionInstanceGraph.nodeCount());
+        scheduleCode.pr("// The number of semaphores needed");
+        scheduleCode.pr("static const int num_semaphores = " + num_semaphores);
+        scheduleCode.pr("// The schedules");
+
+        for (var i = 0; i < this.targetConfig.workers; i++) {
+            scheduleCode.pr("static const inst_t s1_w" + i + "[] = {");
+
+            scheduleCode.pr("}");
+        }
 
         // Generate executable worker schedules using the custom instruction set.
 
