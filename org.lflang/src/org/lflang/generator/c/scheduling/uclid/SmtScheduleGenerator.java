@@ -37,6 +37,8 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.eclipse.xtext.xbase.lib.Exceptions;
 import org.lflang.ErrorReporter;
@@ -96,7 +98,18 @@ public class SmtScheduleGenerator {
 
         // The module declaration
         uclidCode.pr("module main {");
+        uclidCode.pr("");
         uclidCode.indent();
+
+        /*****************************
+         * Types, variables, getters *
+         *****************************/
+        uclidCode.pr(String.join("\n", 
+            "/*****************************",
+            " * Types, variables, getters *",
+            " *****************************/"
+        ));
+        uclidCode.pr("");
 
         // Declare the set of reactions.
         uclidCode.pr("// Declare the set of reactions.");
@@ -109,6 +122,7 @@ public class SmtScheduleGenerator {
         uclidCode.pr("NULL");
         uclidCode.unindent();
         uclidCode.pr("};");
+        uclidCode.pr("");
 
         // Declare worker schedule.
         uclidCode.pr("// Declare worker schedule.");
@@ -117,6 +131,7 @@ public class SmtScheduleGenerator {
         uclidCode.pr(String.join(", ", Collections.nCopies(this.reactionInstanceGraph.nodeCount(), "task_t")));
         uclidCode.unindent();
         uclidCode.pr("};");
+        uclidCode.pr("");
 
         // Declare workers.
         uclidCode.pr("// Declare workers.");
@@ -125,25 +140,165 @@ public class SmtScheduleGenerator {
         uclidCode.pr(String.join(", ", Collections.nCopies(this.targetConfig.workers, "schedule_t")));
         uclidCode.unindent();
         uclidCode.pr("};");
+        uclidCode.pr("");
 
-        // Define groups.
-        // uclidCode.pr("// Define groups.");
-        // uclidCode.pr("group indices : integer = {");
-        // uclidCode.indent();
-        // uclidCode.pr(String.join(", ",
-        //     IntStream.range(0, this.reactionInstanceGraph.nodeCount() - 1)
-        //     .boxed()
-        //     .collect(Collectors.toList())));
-        // uclidCode.unindent();
-        // uclidCode.pr("};");
+        // Define a group of task indices.
+        uclidCode.pr("// Define a group of task indices.");
+        uclidCode.pr("group task_indices : integer = {");
+        uclidCode.indent();
+        uclidCode.pr(String.join(", ",
+            IntStream.range(0, this.reactionInstanceGraph.nodeCount() - 1)
+            .boxed()
+            .collect(Collectors.toList())
+            .stream()
+            .map(String::valueOf)
+            .collect(Collectors.toList())
+        ));
+        uclidCode.unindent();
+        uclidCode.pr("};");
+        uclidCode.pr("");
+
+        // Define a group of worker indices.
+        uclidCode.pr("// Define a group of worker indices.");
+        uclidCode.pr("group worker_indices : integer = {");
+        uclidCode.indent();
+        uclidCode.pr(String.join(", ",
+            IntStream.range(0, this.targetConfig.workers - 1)
+            .boxed()
+            .collect(Collectors.toList())
+            .stream()
+            .map(String::valueOf)
+            .collect(Collectors.toList())
+        ));
+        uclidCode.unindent();
+        uclidCode.pr("};");
+        uclidCode.pr("");
+
+        // Compute the most generic schedule.
+        // Define the current task set assuming all reactions are triggered.
+        uclidCode.pr("// Compute the most generic schedule.");
+        uclidCode.pr("// Define the current task set assuming all reactions are triggered.");
+        uclidCode.pr("group current_task_set : task_t = {");
+        uclidCode.indent();
+        for (var rxn : this.reactionInstanceGraph.nodes()) {
+            // Replace "." and " " with "_".
+            uclidCode.pr(rxn.getFullName().replaceAll("(\\.| )", "_") + ",");
+        }
+        uclidCode.pr("NULL");
+        uclidCode.unindent();
+        uclidCode.pr("};");
+        uclidCode.pr("");
+
+        // Declare workers.
+        uclidCode.pr("// Declare workers.");
+        uclidCode.pr("var workers : workers_t;");
+        uclidCode.pr("");
+
+        // Get a task from a worker schedule.
+        uclidCode.pr("// Get a task from a worker schedule.");
+        uclidCode.pr("define getT(s : schedule_t, i : integer) : task_t =");
+        uclidCode.indent();
+        for (var i = 0; i < this.reactionInstanceGraph.nodeCount(); i++) {
+            uclidCode.pr("(if (i == " + i + ") then s._" + (i+1) + " else");
+        }
+        uclidCode.pr("NULL");
+        uclidCode.unindent();
+        uclidCode.pr(String.join("", Collections.nCopies(this.reactionInstanceGraph.nodeCount(), ")")) + ";");
+        uclidCode.pr("");
+
+        // Get a worker from workers.
+        uclidCode.pr("// Get a worker from workers.");
+        uclidCode.pr("define getW(workers : workers_t, w : integer) : schedule_t =");
+        uclidCode.indent();
+        for (var i = 0; i < this.targetConfig.workers-1; i++) {
+            uclidCode.pr("(if (w == " + i + ") then workers._" + (i+1) + " else");
+        }
+        uclidCode.pr("workers._" + this.targetConfig.workers);
+        uclidCode.unindent();
+        uclidCode.pr(String.join("", Collections.nCopies(this.targetConfig.workers-1, ")")) + ";");
+        uclidCode.pr("");
+
+        // Condense the two getters above.
+        uclidCode.pr("// Condense the two getters above.");
+        uclidCode.pr(String.join("\n", 
+            "define get(w, i : integer) : task_t",
+            "    = getT(getW(workers, w), i);"
+        ));
+        uclidCode.pr("");
+
+        /***************
+         * Constraints *
+         ***************/
+        uclidCode.pr(String.join("\n", 
+            "/***************",
+            " * Constraints *",
+            " ***************/"
+        ));
+        uclidCode.pr("");
+
+        // The schedules cannot be all empty.
+        uclidCode.pr("// The schedules cannot be all empty.");
+        uclidCode.pr(String.join("\n", 
+            "axiom(finite_exists (w : integer) in worker_indices ::",
+            "    (finite_exists (i : integer) in task_indices ::",
+            "        get(w, i) != NULL));"
+        ));
+        uclidCode.pr("");
+
+        // Each reaction only appears once.
+        uclidCode.pr("// Each reaction only appears once.");
+        uclidCode.pr(String.join("\n", 
+            "axiom(finite_forall (w1: integer) in worker_indices ::",
+            "    (finite_forall (w2 : integer) in worker_indices ::",
+            "    (finite_forall (i : integer) in task_indices ::",
+            "    (finite_forall (j : integer) in task_indices ::",
+            "        (get(w1, i) != NULL)",
+            "        ==> ((w1 == w2 && i == j) <==>",
+            "        (get(w1, i) == get(w2, j)))",
+            "    ))));"
+        ));
+        uclidCode.pr("");
+
+        // Each reaction appears at least once.
+        uclidCode.pr("// Each reaction appears at least once.");
+        uclidCode.pr(String.join("\n", 
+            "axiom(finite_forall (task : task_t) in current_task_set ::",
+            "    (finite_exists (w : integer) in worker_indices ::",
+            "    (finite_exists (i : integer) in task_indices ::",
+            "        get(w, i) == task",
+            "    )));"
+        ));
+        uclidCode.pr("");
+
+        // Dependency graph (DAG) with reactions as nodes and
+        // precedence relations as edges.
+        uclidCode.pr(String.join("\n", 
+            "// Dependency graph (DAG) with reactions as nodes and",
+            "// precedence relations as edges."
+        ));
+        uclidCode.pr("define precedes(t1, t2 : task_t) : boolean = false");
+        uclidCode.indent();
+        // Iterate through all the reactions and get their downstream reactions.
+        for (var rxn : this.reactionInstanceGraph.nodes()) {
+            var downstream = this.reactionInstanceGraph.getDownstreamAdjacentNodes(rxn);
+            for (var ds : downstream) {
+                uclidCode.pr("|| (t1 == " + rxn.getFullName().replaceAll("(\\.| )", "_")
+                    + " && t2 == " + ds.getFullName().replaceAll("(\\.| )", "_") + ")");
+            }
+        }
+        uclidCode.unindent();
+        uclidCode.pr(";");
+        uclidCode.pr("");
 
         // Variables for optimization
         uclidCode.pr("// Declare variables for optimization.");
         uclidCode.pr("var num_workers_sum : integer;");
         uclidCode.pr("var DIFF : integer;");
+        uclidCode.pr("");
 
         // Dummy property (to be removed)
         uclidCode.pr("property dummy : false;");
+        uclidCode.pr("");
 
         // The control block
         uclidCode.pr(String.join("\n", 
