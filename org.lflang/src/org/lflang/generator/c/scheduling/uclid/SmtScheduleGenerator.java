@@ -36,8 +36,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.regex.MatchResult;
 import java.util.stream.Collectors;
@@ -51,6 +55,7 @@ import org.lflang.TargetConfig;
 import org.lflang.generator.CodeBuilder;
 import org.lflang.generator.GeneratorBase;
 import org.lflang.generator.ReactionInstance;
+import org.lflang.generator.ReactionInstance.Runtime;
 import org.lflang.generator.ReactionInstanceGraph;
 import org.lflang.generator.ReactorInstance;
 import org.lflang.generator.TargetTypes;
@@ -460,6 +465,7 @@ public class SmtScheduleGenerator {
 
     public CodeBuilder generateScheduleCode() {
         CodeBuilder scheduleCode = new CodeBuilder();
+        List<Integer> scheduleLengths = new ArrayList<Integer>();
 
         // This SMT model contains a set of worker schedules.
         Model model = generateSmtScheduleModel();
@@ -474,39 +480,159 @@ public class SmtScheduleGenerator {
                             .toArray(String[]::new);
 
         // Process the matched strings.
-        List<String[]> schedules = new ArrayList<String[]>();
+        List<List<String>> schedules = new ArrayList<List<String>>();
         for (var i = 0; i < matches.length; i++) {
             System.out.println(matches[i]);
-            schedules.add(matches[i].replaceAll("(\\(|\\)|_tuple_0 |NULL)", "")
-                                    .split("\\s+"));
+            schedules.add(Arrays.asList(matches[i]
+                                        .replaceAll("(\\(|\\)|_tuple_0 |NULL)", "")
+                                        .split("\\s+")));
         }
         for (var schedule : schedules) {
-            System.out.println("Schedule: " + schedule.length);
-            for (var i = 0; i < schedule.length; i++) {
-                System.out.println(schedule[i]);
+            System.out.println("Schedule: " + schedule.size());
+            for (var i = 0; i < schedule.size(); i++) {
+                System.out.println(schedule.get(i));
+            }
+        }        
+
+        // Begin to generate static schedules.
+        scheduleCode.pr("/* Auto-generated schedule */");
+
+        // Generate executable worker schedules using the custom instruction set.
+        int semaphore_count = 0;
+        // Maps a pair of reaction IDs (i.e. <upstream ID, downstream ID>) to a semaphore id.
+        Map<ReactionPair, Integer> semaphoreMap = new HashMap<ReactionPair, Integer>();
+        // Calculate the semaphores needed and store them in a map
+        // mapping from a pair of upstream-downstream reactions to the semaphore id.
+        for (var w = 0; w < this.targetConfig.workers; w++) {
+            for (var i = 0; i < schedules.get(w).size(); i++) {
+                // Get the current reaction to be executed.
+                long reactionID = Long.parseLong(schedules.get(w).get(i).split("_")[1]);
+                var rxn = this.reactionInstanceGraph.getReactionByID(reactionID);
+                
+                // Check if this reaction has upstream reactions processed
+                // by other threads. If so, add a "wait" instruction.
+                var upstream = this.reactionInstanceGraph.getUpstreamAdjacentNodes(rxn);
+                for (Runtime us : upstream) {
+                    // Iterate over schedules other than the current schedule.
+                    for (var w2 = 0; w2 < this.targetConfig.workers; w2++) {
+                        // Skip if it is the current schedule.
+                        if (w2 == w) continue;
+                        // If another schedule contains the upstream reaction,
+                        // add a semaphore.
+                        if (schedules.get(w2).contains(us)) {
+                            semaphoreMap.put(new ReactionPair(us.getReactionID(), // Upstream ID
+                                                                reactionID),      // Downstream ID
+                                            semaphore_count); // Semaphore index
+                            semaphore_count++;
+                        }
+                    }
+                }
             }
         }
 
-        // Calculate the number of semaphores needed.
-        int num_semaphores = 0;
+        // Generate static schedules.
+        scheduleCode.pr("// The static schedules");
+        for (var w = 0; w < this.targetConfig.workers; w++) {
+            int scheduleLength = 0;
+            String instructions = "";
+            scheduleCode.pr("static const inst_t s1_w" + w + "[] = {");
+            scheduleCode.indent();
 
-        // Generate preambles (everything other than the schedule in the .h file).
-        scheduleCode.pr("/* Auto-generated schedule */");
-        scheduleCode.pr("// The total number of reactions");
-        scheduleCode.pr("static const int reaction_count = "
-                        + this.reactionInstanceGraph.nodeCount());
-        scheduleCode.pr("// The number of semaphores needed");
-        scheduleCode.pr("static const int num_semaphores = " + num_semaphores);
-        scheduleCode.pr("// The schedules");
+            for (var i = 0; i < schedules.get(w).size(); i++) {
+                // Get the current reaction to be executed.
+                var reactionID = Long.parseLong(schedules.get(w).get(i).split("_")[1]);
 
-        for (var i = 0; i < this.targetConfig.workers; i++) {
-            scheduleCode.pr("static const inst_t s1_w" + i + "[] = {");
+                // Add the "execute" instruction to the list.
+                instructions += "{.inst='e', .op=" + reactionID + "},\n";
+                scheduleLength++;
 
-            scheduleCode.pr("}");
+                // Generate "wait" and "notify" instructions.
+                for (Map.Entry<ReactionPair,Integer> entry : semaphoreMap.entrySet()) {
+                    ReactionPair reactionPair = entry.getKey();
+                    int semaphoreID = entry.getValue();
+                    // Check if reactionID is the upstream reaction.
+                    // If so, generate a "notify."
+                    if (reactionID == reactionPair.getUpstream()) {
+                        instructions += "{.inst='n', .op=" + semaphoreID + "},\n";
+                        scheduleLength++;
+                    } 
+                    // Check if reactionID is the downstream reaction.
+                    // If so, generate a "wait."
+                    else if (reactionID == reactionPair.getDownstream()) {
+                        // Prepend "wait" instructions.
+                        instructions = "{.inst='w', .op=" + semaphoreID + "},\n" + instructions;
+                        scheduleLength++;
+                    }
+                }
+            }
+
+            // Generate "stop" instruction.
+            instructions += "{.inst='s', .op=0}";
+            scheduleLength++;
+
+            // Finally, print all the instructions for this worker schedule.
+            scheduleCode.pr(instructions);
+
+            // Add the lengths to scheduleLengths
+            scheduleLengths.add(scheduleLength);
+            
+            scheduleCode.unindent();
+            scheduleCode.pr("};");
         }
 
-        // Generate executable worker schedules using the custom instruction set.
+        // Create an array to store the worker schedules.
+        scheduleCode.pr("static const inst_t* s1[] = {");
+        scheduleCode.indent();
+        for (var w = 0; w < this.targetConfig.workers; w++) {
+            scheduleCode.pr("s1_w" + w
+                + (w == this.targetConfig.workers - 1 ? "" : ","));
+        }
+        scheduleCode.unindent();
+        scheduleCode.pr("};");
+
+        // Create a schedule array to store all the schedules
+        // (currently only 1 generic schedule)
+        // FIXME: Generalize to multiple schedules.
+        scheduleCode.pr("static const inst_t** static_schedules[] = { s1 };");
+
+        // Create an array to store the schedule lengths
+        scheduleCode.pr("static const uint32_t s1_length[] = {");
+        scheduleCode.indent();
+        for (var w = 0; w < this.targetConfig.workers; w++) {
+            scheduleCode.pr(scheduleLengths.get(w) 
+                + (w == this.targetConfig.workers - 1 ? "" : ","));
+        }
+        scheduleCode.unindent();
+        scheduleCode.pr("};");
+
+        // Create an array to store the lengths of all schedules
+        // (currently only the length of the generic schedule)
+        // FIXME: Generalize to multiple schedules.
+        scheduleCode.pr("static const uint32_t* schedule_lengths[] = { s1_length };");
+
+        // Generate preambles (everything other than the schedule in the .h file).
+        scheduleCode.pr("// The total number of reactions");
+        scheduleCode.pr("static const int reaction_count = "
+                        + this.reactionInstanceGraph.nodeCount() + ";");
+        scheduleCode.pr("// The number of semaphores needed");
+        scheduleCode.pr("static const int num_semaphores = " + semaphore_count + ";");
 
         return scheduleCode;
+    }
+
+    // Private helper class for storing a pair of reactions
+    private class ReactionPair {
+        private long upstreamID;
+        private long downstreamID; 
+        public ReactionPair(long upstream, long downstream) {
+            this.upstreamID = upstream;
+            this.downstreamID = downstream;
+        }
+        public long getUpstream() {
+            return this.upstreamID;
+        }
+        public long getDownstream() {
+            return this.downstreamID;
+        }
     }
 }

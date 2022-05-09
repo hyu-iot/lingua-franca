@@ -31,10 +31,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.eclipse.xtext.xbase.lib.Exceptions;
+
 import org.lflang.generator.ReactionInstance.Runtime;
 import org.lflang.graph.PrecedenceGraph;
 import org.lflang.lf.Variable;
-
 /**
  * This class analyzes the dependencies between reaction runtime instances.
  * For each ReactionInstance, there may be more than one runtime instance because
@@ -122,6 +123,19 @@ public class ReactionInstanceGraph extends PrecedenceGraph<ReactionInstance.Runt
         return maxBreadth;
     }
 
+    /*
+     * Get a reaction in the dependency graph based on a reaction ID.
+     */
+    public Runtime getReactionByID(long reactionID) {
+        for (var node : this.nodes()) {
+            if (node.getReactionID() == reactionID)
+                return node;
+        }
+        Exceptions.sneakyThrow(
+            new Exception("Reaction with ID " + reactionID + " not found."));
+        return null;
+    }
+    
     ///////////////////////////////////////////////////////////
     //// Protected methods
         
