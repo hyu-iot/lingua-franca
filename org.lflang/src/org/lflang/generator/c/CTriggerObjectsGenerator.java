@@ -18,6 +18,7 @@ import org.lflang.ASTUtils;
 import org.lflang.TargetConfig;
 import org.lflang.TargetProperty.CoordinationType;
 import org.lflang.TargetProperty.LogLevel;
+import org.lflang.TargetProperty.SchedulerOption;
 import org.lflang.federated.CGeneratorExtension;
 import org.lflang.federated.FederateInstance;
 import org.lflang.generator.CodeBuilder;
@@ -159,11 +160,13 @@ public class CTriggerObjectsGenerator {
             isFederated,
             clockSyncIsOn
         ));
-        code.pr(generateReactionInstanceList( 
-            federate, 
-            main,
-            isFederated
-        ));
+        if (targetConfig.schedulerType == SchedulerOption.QS) {
+            code.pr(generateReactionInstanceList( 
+                federate, 
+                main,
+                isFederated
+            ));
+        }
         code.pr(generateSchedulerInitializer(
             main,
             targetConfig
@@ -194,7 +197,8 @@ public class CTriggerObjectsGenerator {
             "sched_params_t sched_params = (sched_params_t) {",
             "                        .num_reactions_per_level = &num_reactions_per_level[0],",
             "                        .num_reactions_per_level_size = (size_t) "+numReactionsPerLevel.length+",",
-            "                        .reaction_instances = _lf_reaction_instances};",
+            (targetConfig.schedulerType == SchedulerOption.QS ?
+            "                        .reaction_instances = _lf_reaction_instances};" : "};"),
             "lf_sched_init(",
             "    (size_t)_lf_number_of_workers,",
             "    &sched_params",
@@ -429,8 +433,6 @@ private static String generateReactionInstanceList(
         ReactorInstance reactor,
         boolean isFederated) {
     var code = new CodeBuilder();
-    int reactionId = 0;
-    var numReactionsPerLevel = reactor.assignLevels().getNumReactionsPerLevel();
     code.pr( "reaction_t **_lf_reaction_instances = (reaction_t**) calloc("+reactionNum+", sizeof(reaction_t*));");
     generateReactionInstances(currentFederate,reactor, isFederated, code);
     return code.toString();
