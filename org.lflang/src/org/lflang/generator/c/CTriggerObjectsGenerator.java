@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import org.lflang.ASTUtils;
@@ -26,6 +27,7 @@ import org.lflang.generator.GeneratorBase;
 import org.lflang.generator.ParameterInstance;
 import org.lflang.generator.PortInstance;
 import org.lflang.generator.ReactionInstance;
+import org.lflang.generator.ReactionInstance.Runtime;
 import org.lflang.generator.ReactorInstance;
 import org.lflang.generator.RuntimeRange;
 import org.lflang.generator.SendRange;
@@ -411,7 +413,12 @@ public class CTriggerObjectsGenerator {
                         CUtil.reactionRef(r)+".index = ("+reactionDeadline+" << 16) | "+r.uniqueID()+"_levels["+CUtil.runtimeIndex(r.getParent())+"];"
                     ));
                 }
-                reactionNum +=1;
+                if(reactor.isBank()){
+                    reactionNum += reactor.getWidth();
+
+                }else{
+                    reactionNum += 1;
+                }
             }
         }
         for (ReactorInstance child : reactor.children) {
@@ -433,6 +440,7 @@ private static String generateReactionInstanceList(
         ReactorInstance reactor,
         boolean isFederated) {
     var code = new CodeBuilder();
+    // var numReactionsPerLevel = reactor.assignLevels().getNumReactionsPerLevel();
     code.pr( "reaction_t **_lf_reaction_instances = (reaction_t**) calloc("+reactionNum+", sizeof(reaction_t*));");
     generateReactionInstances(currentFederate,reactor, isFederated, code);
     return code.toString();
@@ -444,19 +452,29 @@ private static int generateReactionInstances(
         CodeBuilder code,
         int reactionId
     ){
-        // if(!reactor.reactions.isEmpty()){
-        //     code.pr("//reactorreactions are not empty");
-        // }
-        // else{
-        //     code.pr("//reactor.reactions are not empty");
-        // }
-        for (ReactionInstance r : reactor.reactions) {
-            code.pr(String.join("", "_lf_reaction_instances["+reactionId+"] = ", "&", CUtil.reactionRef(r), ";"));
-            reactionId +=1;
+        if (reactor != null && reactor.isBank()) {
+            for (ReactionInstance r : reactor.reactions) {
+                List<Runtime> runtimes = r.getRuntimeInstances();
+            
+                for (Runtime rt :runtimes) {
+                    code.pr(String.join("", "_lf_reaction_instances["+reactionId+"] = ", "&", CUtil.reactionRef(rt.getReaction(), Integer.toString(rt.id)), ";"));
+                    rt.reactionID = reactionId;
+                    reactionId +=1;
+                }
+            }
+        }else{
+            for (ReactionInstance r : reactor.reactions) {
+                code.pr(String.join("", "_lf_reaction_instances["+reactionId+"] = ", "&", CUtil.reactionRef(r), ";"));
+                for(Runtime rt: r.getRuntimeInstances()){
+                    rt.reactionID = reactionId;
+                    reactionId +=1;
+                }
+            }
         }
+        
          for (ReactorInstance child : reactor.children) {
             if (currentFederate.contains(child)) {
-                 reactionId = generateReactionInstances(currentFederate, child, isFederated, code, reactionId);
+                 generateReactionInstances(currentFederate, child, isFederated, code);
             }
         }
         return reactionId;

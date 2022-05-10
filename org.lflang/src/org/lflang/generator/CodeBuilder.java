@@ -207,7 +207,6 @@ public class CodeBuilder {
             var index = CUtil.bankIndexName(reactor);
             if (reactor.depth == 1 && isFederated && restrict) {
                 // Special case: A bank of federates. Instantiate only the current federate.
-                startScopedBlock();
                 pr("int "+index+" = "+federate.bankIndex+";");
             } else {
                 pr("// Reactor is a bank. Iterate over bank members.");

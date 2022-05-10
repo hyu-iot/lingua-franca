@@ -490,6 +490,7 @@ public class ReactionInstance extends NamedInstance<Reaction> {
         /** ID ranging from 0 to parent.getTotalWidth() - 1. */
         public int id = 0;
         public int level = 0;
+        public int reactionID = 0;
         
         public ReactionInstance getReaction() {
             return ReactionInstance.this;
