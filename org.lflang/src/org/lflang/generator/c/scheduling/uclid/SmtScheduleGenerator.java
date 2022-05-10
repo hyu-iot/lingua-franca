@@ -535,16 +535,20 @@ public class SmtScheduleGenerator {
         scheduleCode.pr("// The static schedules");
         for (var w = 0; w < this.targetConfig.workers; w++) {
             int scheduleLength = 0;
-            String instructions = "";
             scheduleCode.pr("static const inst_t s1_w" + w + "[] = {");
             scheduleCode.indent();
 
             for (var i = 0; i < schedules.get(w).size(); i++) {
+                String instructions = "";
+
                 // Get the current reaction to be executed.
                 var reactionID = Long.parseLong(schedules.get(w).get(i).split("_")[1]);
 
                 // Add the "execute" instruction to the list.
-                instructions += "{.inst='e', .op=" + reactionID + "},\n";
+                instructions += "{.inst='e', .op=" + reactionID + "}, "
+                                + "// Execute "
+                                + this.reactionInstanceGraph.getReactionByID(reactionID).getFullName()
+                                + ".\n";
                 scheduleLength++;
 
                 // Generate "wait" and "notify" instructions.
@@ -552,30 +556,31 @@ public class SmtScheduleGenerator {
                     ReactionPair reactionPair = entry.getKey();
                     int semaphoreID = entry.getValue();
 
-
-
                     // Check if reactionID is the upstream reaction.
                     // If so, generate a "notify."
                     if (reactionID == reactionPair.getUpstream()) {
-                        instructions += "{.inst='n', .op=" + semaphoreID + "},\n";
+                        instructions += "{.inst='n', .op=" + semaphoreID + "}, "
+                                        + "// Notify semaphore " + semaphoreID + ".\n";
                         scheduleLength++;
                     }
                     // Check if reactionID is the downstream reaction.
                     // If so, generate a "wait."
                     else if (reactionID == reactionPair.getDownstream()) {
                         // Prepend "wait" instructions.
-                        instructions = "{.inst='w', .op=" + semaphoreID + "},\n" + instructions;
+                        instructions = "{.inst='w', .op=" + semaphoreID + "}, "
+                                        + "// Wait for semaphore " + semaphoreID + ".\n" 
+                                        + instructions;
                         scheduleLength++;
                     }
                 }
+
+                // Finally, print all the instructions for this worker schedule.
+                scheduleCode.pr(instructions);
             }
 
             // Generate "stop" instruction.
-            instructions += "{.inst='s', .op=0}";
+            scheduleCode.pr("{.inst='s', .op=0}");
             scheduleLength++;
-
-            // Finally, print all the instructions for this worker schedule.
-            scheduleCode.pr(instructions);
 
             // Add the lengths to scheduleLengths
             scheduleLengths.add(scheduleLength);
