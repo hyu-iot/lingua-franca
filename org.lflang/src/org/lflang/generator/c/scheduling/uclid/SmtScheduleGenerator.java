@@ -431,27 +431,11 @@ public class SmtScheduleGenerator {
         } catch (IOException e) {
             Exceptions.sneakyThrow(e);
         }
-        // System.out.println(smtStr);
 
         // Remove Uclid variable prefixes using regex.
         smtStr = smtStr.replaceAll("initial_([0-9]+)_", ""); // or "initial_\\d+_", \\ escapes \.
         smtStr = smtStr.replaceAll("\\(check-sat\\)", "");
         smtStr = smtStr.replaceAll("\\(get-info :all-statistics\\)", "");
-        // System.out.println(smtStr);
-
-        // Add optimization objectives for load balancing.
-        //
-        // FIXME: This just divides the number of tasks,
-        // but might not indicate parallelism.
-        // For parallelism, we need to maximize the number
-        // of concurrent tasks, i.e. the sum of non-NULL
-        // reactions for a particular task index across all workers.
-        // for (var i = 0; i < this.targetConfig.workers; i++) {
-        //     for (var j = i; j < this.targetConfig.workers; j++) {
-        //         if (j == i) continue;
-        //         smtStr += "(minimize (abs (- count_w" + i + " count_w" + j + ")))";
-        //     }
-        // }
 
         // Add optimization objectives for parallelization.
         smtStr += "(maximize parallel_metric)\n";
@@ -473,40 +457,8 @@ public class SmtScheduleGenerator {
             Exceptions.sneakyThrow(e);
         }
 
-        // // Load the SMT string into the Z3 Java binding.
-        // Context ctx = new Context();
-        // Optimize opt = ctx.mkOptimize();
-        // opt.fromString(smtStr);
-
-        // // Solve for results.
-        // Status sat = opt.Check();
-        // // System.out.println(sat);
-        // Model model = null;
-        // if (sat == Status.SATISFIABLE) {
-        //     model = opt.getModel();
-        //     // System.out.println(model);
-        // } else {
-        //     Exceptions.sneakyThrow(new Exception("Error: No satisfiable schedule is found."));
-        // }
-
-        // Compile Uclid encoding to a SMT file.
-        // LFCommand cmdRunZ3 = LFCommand.get(
-        //     "z3",
-        //     List.of(smtFile),
-        //     false,
-        //     Paths.get(tempFolder)
-        // );
-        // cmdRunZ3.run();
-        // File output = new File(tempFolder + File.separator + "z3result.txt");
-        // ProcessBuilder pb = new ProcessBuilder("z3", smtFile, ">", tempFolder + File.separator + "z3result.txt");
-        // pb.redirectOutput(output);
-        // try {
-        //     Process p = pb.start();
-        // } catch (IOException e) {
-        //     Exceptions.sneakyThrow(e);
-        // }
-
         // FIXME: Factor this in LFCommand.java.
+        // Run Z3 on the printed SMT file.
         StringBuilder sb = new StringBuilder();
         try {
             ProcessBuilder pb = new ProcessBuilder("z3", smtFile);
@@ -517,18 +469,7 @@ public class SmtScheduleGenerator {
         } catch (IOException e) {
             Exceptions.sneakyThrow(e);
         }
-          
-        System.out.println(sb.toString());
-
         String model = sb.toString();
-        
-        // String model = "";
-        // try {
-        //     model = Files.readString(Paths.get(tempFolder + File.separator + "z3result.txt"),
-        //                                         StandardCharsets.US_ASCII);
-        // } catch (IOException e) {
-        //     Exceptions.sneakyThrow(e);
-        // }
 
         return model;
     }
@@ -538,9 +479,6 @@ public class SmtScheduleGenerator {
         List<Integer> scheduleLengths = new ArrayList<Integer>();
 
         // This SMT model contains a set of worker schedules.
-        // Model model = generateSmtScheduleModel();
-        // System.out.println(model);
-        // String modelStr = model.toString();
         String modelStr = generateSmtScheduleModel();
 
         // Use regex to parse generated schedules.
