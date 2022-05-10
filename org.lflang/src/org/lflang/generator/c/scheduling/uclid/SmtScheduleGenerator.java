@@ -484,7 +484,8 @@ public class SmtScheduleGenerator {
         for (var i = 0; i < matches.length; i++) {
             System.out.println(matches[i]);
             schedules.add(Arrays.asList(matches[i]
-                                        .replaceAll("(\\(|\\)|_tuple_0 |NULL)", "")
+                                        .replaceAll("(\\(|\\)|_tuple_0|NULL)", "")
+                                        .strip()
                                         .split("\\s+")));
         }
         for (var schedule : schedules) {
@@ -519,7 +520,7 @@ public class SmtScheduleGenerator {
                         if (w2 == w) continue;
                         // If another schedule contains the upstream reaction,
                         // add a semaphore.
-                        if (schedules.get(w2).contains(us)) {
+                        if (schedules.get(w2).contains("rxn_" + us.getReactionID())) {
                             semaphoreMap.put(new ReactionPair(us.getReactionID(), // Upstream ID
                                                                 reactionID),      // Downstream ID
                                             semaphore_count); // Semaphore index
@@ -550,12 +551,15 @@ public class SmtScheduleGenerator {
                 for (Map.Entry<ReactionPair,Integer> entry : semaphoreMap.entrySet()) {
                     ReactionPair reactionPair = entry.getKey();
                     int semaphoreID = entry.getValue();
+
+
+
                     // Check if reactionID is the upstream reaction.
                     // If so, generate a "notify."
                     if (reactionID == reactionPair.getUpstream()) {
                         instructions += "{.inst='n', .op=" + semaphoreID + "},\n";
                         scheduleLength++;
-                    } 
+                    }
                     // Check if reactionID is the downstream reaction.
                     // If so, generate a "wait."
                     else if (reactionID == reactionPair.getDownstream()) {
