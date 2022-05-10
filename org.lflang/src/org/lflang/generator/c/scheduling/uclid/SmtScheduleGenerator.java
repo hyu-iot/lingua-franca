@@ -322,31 +322,57 @@ public class SmtScheduleGenerator {
         ));
         uclidCode.pr("");
 
-        // Optimization 1: load balancing
-        uclidCode.pr("// Optimization 1: load balancing");
-        uclidCode.pr("define count(s : schedule_t) : integer = 0");
+        // Optimization 1: load balancing (to deprecate)
+        // uclidCode.pr("// Optimization 1: load balancing");
+        // uclidCode.pr("define count(s : schedule_t) : integer = 0");
+        // uclidCode.indent();
+        // for (var i = 0; i < this.reactionInstanceGraph.nodeCount(); i++) {
+        //     uclidCode.pr("+ (if (getT(s, " + i + ") != NULL) then 1 else 0)");
+        // }
+        // uclidCode.unindent();
+        // uclidCode.pr(";");
+        // uclidCode.pr("");
+
+        // // Declare variables that count the number of
+        // // non-NULL reactions for each worker schedule.
+        // uclidCode.pr(String.join("\n", 
+        //     "// Declare variables that count the number of",
+        //     "// non-NULL reactions for each worker schedule."
+        // ));
+        // for (var i = 0; i < this.targetConfig.workers; i++) {
+        //     uclidCode.pr("var count_w" + i + " : integer;");
+        //     uclidCode.pr("axiom(count_w" + i + " == count(getW(workers, " + i + ")));");
+        // }
+        // uclidCode.pr("");
+
+        // Optimization 2: parallelization
+        uclidCode.pr("// Optimization: maximize parallelization");
+        uclidCode.pr(String.join("\n",
+            "// A macro function that counts the number of reactions",
+            "// that could run in parallel at an instant."));
+        uclidCode.pr("define countP(step : integer) : integer = 0");
         uclidCode.indent();
-        for (var i = 0; i < this.reactionInstanceGraph.nodeCount(); i++) {
-            uclidCode.pr("+ (if (getT(s, " + i + ") != NULL) then 1 else 0)");
+        for (var i = 0; i < this.targetConfig.workers; i++) {
+            uclidCode.pr("+ (if (get(" + i + ", step) != NULL) then 1 else 0)");
         }
         uclidCode.unindent();
         uclidCode.pr(";");
         uclidCode.pr("");
 
-        // Declare variables that count the number of
-        // non-NULL reactions for each worker schedule.
-        uclidCode.pr(String.join("\n", 
-            "// Declare variables that count the number of",
-            "// non-NULL reactions for each worker schedule."
-        ));
-        for (var i = 0; i < this.targetConfig.workers; i++) {
-            uclidCode.pr("var count_w" + i + " : integer;");
-            uclidCode.pr("axiom(count_w" + i + " == count(getW(workers, " + i + ")));");
+        // Use sum of square to compute the parallel metric.
+        uclidCode.pr("// Use sum of square to compute the parallel metric.");
+        uclidCode.pr("var parallel_metric : integer;");
+        uclidCode.pr("axiom(parallel_metric == 1");
+        uclidCode.indent();
+        for (var i = 0; i < this.reactionInstanceGraph.nodeCount(); i++) {
+            uclidCode.pr("+ (countP(" + i + ") * countP(" + i + "))");
         }
+        uclidCode.unindent();
+        uclidCode.pr(");");
         uclidCode.pr("");
 
-        // Optimization 2: spatial locality
-        uclidCode.pr("// TODO: Optimization 2: spatial locality");
+        // Optimization 3: spatial locality
+        uclidCode.pr("// TODO: Optimization 3: spatial locality");
 
         // Property
         uclidCode.pr("property prop : !(true);");
@@ -369,7 +395,7 @@ public class SmtScheduleGenerator {
         return uclidCode;
     }
 
-    public Model generateSmtScheduleModel() {
+    public String generateSmtScheduleModel() {
         // Create temp folder
         var tempFolder  = fileConfig.getSrcGenPath() + File.separator + "temp";
         try {
@@ -420,12 +446,15 @@ public class SmtScheduleGenerator {
         // For parallelism, we need to maximize the number
         // of concurrent tasks, i.e. the sum of non-NULL
         // reactions for a particular task index across all workers.
-        for (var i = 0; i < this.targetConfig.workers; i++) {
-            for (var j = i; j < this.targetConfig.workers; j++) {
-                if (j == i) continue;
-                smtStr += "(minimize (abs (- count_w" + i + " count_w" + j + ")))";
-            }
-        }
+        // for (var i = 0; i < this.targetConfig.workers; i++) {
+        //     for (var j = i; j < this.targetConfig.workers; j++) {
+        //         if (j == i) continue;
+        //         smtStr += "(minimize (abs (- count_w" + i + " count_w" + j + ")))";
+        //     }
+        // }
+
+        // Add optimization objectives for parallelization.
+        smtStr += "(maximize parallel_metric)\n";
 
         // Add directives.
         smtStr += String.join("\n", 
@@ -444,21 +473,62 @@ public class SmtScheduleGenerator {
             Exceptions.sneakyThrow(e);
         }
 
-        // Load the SMT string into the Z3 Java binding.
-        Context ctx = new Context();
-        Solver s = ctx.mkSolver();
-        s.fromString(smtStr);
+        // // Load the SMT string into the Z3 Java binding.
+        // Context ctx = new Context();
+        // Optimize opt = ctx.mkOptimize();
+        // opt.fromString(smtStr);
 
-        // Solve for results.
-        Status sat = s.check();
-        // System.out.println(sat);
-        Model model = null;
-        if (sat == Status.SATISFIABLE) {
-            model = s.getModel();
-            // System.out.println(model);
-        } else {
-            Exceptions.sneakyThrow(new Exception("Error: No satisfiable schedule is found."));
+        // // Solve for results.
+        // Status sat = opt.Check();
+        // // System.out.println(sat);
+        // Model model = null;
+        // if (sat == Status.SATISFIABLE) {
+        //     model = opt.getModel();
+        //     // System.out.println(model);
+        // } else {
+        //     Exceptions.sneakyThrow(new Exception("Error: No satisfiable schedule is found."));
+        // }
+
+        // Compile Uclid encoding to a SMT file.
+        // LFCommand cmdRunZ3 = LFCommand.get(
+        //     "z3",
+        //     List.of(smtFile),
+        //     false,
+        //     Paths.get(tempFolder)
+        // );
+        // cmdRunZ3.run();
+        // File output = new File(tempFolder + File.separator + "z3result.txt");
+        // ProcessBuilder pb = new ProcessBuilder("z3", smtFile, ">", tempFolder + File.separator + "z3result.txt");
+        // pb.redirectOutput(output);
+        // try {
+        //     Process p = pb.start();
+        // } catch (IOException e) {
+        //     Exceptions.sneakyThrow(e);
+        // }
+
+        // FIXME: Factor this in LFCommand.java.
+        StringBuilder sb = new StringBuilder();
+        try {
+            ProcessBuilder pb = new ProcessBuilder("z3", smtFile);
+            final Process p=pb.start();
+            BufferedReader br=new BufferedReader(new InputStreamReader(p.getInputStream()));
+            String line;
+            while((line=br.readLine())!=null) sb.append(line);
+        } catch (IOException e) {
+            Exceptions.sneakyThrow(e);
         }
+          
+        System.out.println(sb.toString());
+
+        String model = sb.toString();
+        
+        // String model = "";
+        // try {
+        //     model = Files.readString(Paths.get(tempFolder + File.separator + "z3result.txt"),
+        //                                         StandardCharsets.US_ASCII);
+        // } catch (IOException e) {
+        //     Exceptions.sneakyThrow(e);
+        // }
 
         return model;
     }
@@ -468,9 +538,10 @@ public class SmtScheduleGenerator {
         List<Integer> scheduleLengths = new ArrayList<Integer>();
 
         // This SMT model contains a set of worker schedules.
-        Model model = generateSmtScheduleModel();
-        System.out.println(model);
-        String modelStr = model.toString();
+        // Model model = generateSmtScheduleModel();
+        // System.out.println(model);
+        // String modelStr = model.toString();
+        String modelStr = generateSmtScheduleModel();
 
         // Use regex to parse generated schedules.
         String[] matches = Pattern.compile("\\(_tuple_0 ([A-Za-z0-9\\_\\s\\n]+)\\)")
