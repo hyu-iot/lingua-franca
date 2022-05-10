@@ -492,10 +492,13 @@ public class SmtScheduleGenerator {
         List<List<String>> schedules = new ArrayList<List<String>>();
         for (var i = 0; i < matches.length; i++) {
             System.out.println(matches[i]);
-            schedules.add(Arrays.asList(matches[i]
-                                        .replaceAll("(\\(|\\)|_tuple_0|NULL)", "")
-                                        .strip()
-                                        .split("\\s+")));
+            String str = matches[i].replaceAll("(\\(|\\)|_tuple_0|NULL)", "").strip();
+            if (str.isBlank()) {
+                // Add an empty list to schedules
+                schedules.add(new ArrayList());
+            } else {
+                schedules.add(Arrays.asList(str.split("\\s+")));
+            }
         }
         for (var schedule : schedules) {
             System.out.println("Schedule: " + schedule.size());
