@@ -105,9 +105,12 @@ import org.lflang.lf.Variable;
 import org.lflang.lf.WidthTerm;
 import org.lflang.util.FileUtil;
 
+<<<<<<< HEAD
 import com.google.common.base.Objects;
 import com.google.common.collect.Iterables;
 
+=======
+>>>>>>> dc50c1d99 (remove trailing whitespace)
 /**
  * Generator for C target. This class generates C code defining each reactor
  * class given in the input .lf file and imported .lf files. The generated code
@@ -1108,7 +1111,16 @@ public class CGenerator extends GeneratorBase {
         }
     }
 
+<<<<<<< HEAD
     /** Create a launcher script that executes all the federates and the RTI. */
+=======
+    /**
+     * Create a launcher script that executes all the federates and the RTI.
+     *
+     * @param coreFiles The files from the core directory that must be
+     *  copied to the remote machines.
+     */
+>>>>>>> dc50c1d99 (remove trailing whitespace)
     public void createFederatedLauncher() throws IOException{
         var launcher = new FedCLauncher(
             targetConfig,
@@ -1217,6 +1229,7 @@ public class CGenerator extends GeneratorBase {
         code.pr("");
     }
 
+<<<<<<< HEAD
     /**
      * Generate methods for {@code reactor}.
      */
@@ -1224,6 +1237,8 @@ public class CGenerator extends GeneratorBase {
         CMethodGenerator.generateMethods(reactor, code, types);
     }
 
+=======
+>>>>>>> dc50c1d99 (remove trailing whitespace)
     /**
      * Generates preambles defined by user for a given reactor
      * @param reactor The given reactor
@@ -1552,7 +1567,11 @@ public class CGenerator extends GeneratorBase {
      *  a struct that contains parameters, state variables, inputs (triggering or not),
      *  actions (triggering or produced), and outputs.
      *  @param reaction The reaction.
+<<<<<<< HEAD
      *  @param decl The reactor.
+=======
+     *  @param reactor The reactor.
+>>>>>>> dc50c1d99 (remove trailing whitespace)
      *  @param reactionIndex The position of the reaction within the reactor.
      */
     protected void generateReaction(Reaction reaction, ReactorDecl decl, int reactionIndex) {
@@ -2454,7 +2473,11 @@ public class CGenerator extends GeneratorBase {
      * input port "port" or has it in its sources. If there are only connections to contained
      * reactors, in the top-level reactor.
      *
+<<<<<<< HEAD
      * @param receivingPortID The ID of the port to generate the control reaction for
+=======
+     * @param port The port to generate the control reaction for
+>>>>>>> dc50c1d99 (remove trailing whitespace)
      * @param maxSTP The maximum value of STP is assigned to reactions (if any)
      *  that have port as their trigger or source
      */
