@@ -192,12 +192,6 @@ public class ReactionInstance extends NamedInstance<Reaction> {
     //////////////////////////////////////////////////////
     //// Public fields.
 
-    /**
-     * A unique integer ID for identifying this reaction from
-     * all the other reactions in the program
-     */
-    public long reactionID;
-
     /** 
      * Indicates the chain this reaction is a part of. It is constructed
      * through a bit-wise or among all upstream chains. Each fork in the
@@ -490,14 +484,14 @@ public class ReactionInstance extends NamedInstance<Reaction> {
         /** ID ranging from 0 to parent.getTotalWidth() - 1. */
         public int id = 0;
         public int level = 0;
-        public int reactionID = 0;
+        public int reactionID = 0; // Reaction Runtime ID
         
         public ReactionInstance getReaction() {
             return ReactionInstance.this;
         }
 
         public long getReactionID() {
-            return ReactionInstance.this.reactionID;
+            return this.reactionID;
         }
 
         public String getFullName() {
