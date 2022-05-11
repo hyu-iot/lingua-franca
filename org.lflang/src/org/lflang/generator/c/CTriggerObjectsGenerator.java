@@ -413,10 +413,11 @@ public class CTriggerObjectsGenerator {
                         CUtil.reactionRef(r)+".index = ("+reactionDeadline+" << 16) | "+r.uniqueID()+"_levels["+CUtil.runtimeIndex(r.getParent())+"];"
                     ));
                 }
-                if(reactor.isBank()){
-                    reactionNum += reactor.getWidth();
+                if(reactor.isBank()||(reactor.getParent() != null && reactor.getParent().isBank())){
+                    reactionNum += reactor.getTotalWidth();
 
-                }else{
+                }
+                else{
                     reactionNum += 1;
                 }
             }
@@ -452,7 +453,9 @@ private static int generateReactionInstances(
         CodeBuilder code,
         int reactionId
     ){
-        if (reactor != null && reactor.isBank()) {
+        //FIXME: CHECK WHETHER THE PARENT OF REACTOR IS BANK
+        if (reactor != null && (reactor.isBank()||(reactor.getParent() != null&& reactor.getParent().isBank()))) {
+         //if(reactor != null && reactor.isBank()){
             for (ReactionInstance r : reactor.reactions) {
                 List<Runtime> runtimes = r.getRuntimeInstances();
             
