@@ -45,6 +45,11 @@
                     <cleanupDaemonThreads>false</cleanupDaemonThreads> <!-- see https://bugs.eclipse.org/bugs/show_bug.cgi?id=475098#c3 -->
                 </configuration>
                 <dependencies>
+                    <dependency>
+                        <groupId>tools.aqua</groupId>
+                        <artifactId>z3-turnkey</artifactId>
+                        <version>${z3Version}</version>
+                    </dependency>
                     <!-- https://mvnrepository.com/artifact/commons-cli/commons-cli -->
                     <dependency>
                         <groupId>commons-cli</groupId>

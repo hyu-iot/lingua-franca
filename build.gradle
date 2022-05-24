@@ -34,7 +34,7 @@ subprojects {
         // https://mvnrepository.com/artifact/commons-cli/commons-cli
         implementation group: 'commons-cli', name: 'commons-cli', version: commonsCliVersion
         // https://search.maven.org/artifact/tools.aqua/z3-turnkey/4.8.16/jar
-        implementation 'tools.aqua:z3-turnkey:4.8.16'
+        implementation "tools.aqua:z3-turnkey:${z3Version}"
 
     }
     dependencies {
