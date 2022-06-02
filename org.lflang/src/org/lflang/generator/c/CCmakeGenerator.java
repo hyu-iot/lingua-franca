@@ -232,12 +232,6 @@ class CCmakeGenerator {
                     cMakeCode.pr("add_link_options( "+compilerFlag+")");
             }
         }
-
-        if (targetConfig.schedulerType == SchedulerOption.QS) {
-            cMakeCode.newLine();
-            cMakeCode.pr("add_compile_definitions(SCHEDULER_QS)");
-            cMakeCode.newLine();
-        }
         
         // Add the install option
         cMakeCode.pr("install(");

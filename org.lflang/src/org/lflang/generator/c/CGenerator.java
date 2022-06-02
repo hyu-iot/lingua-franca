@@ -86,6 +86,7 @@ import org.lflang.generator.SubContext;
 import org.lflang.generator.TargetTypes;
 import org.lflang.generator.TimerInstance;
 import org.lflang.generator.TriggerInstance;
+import org.lflang.generator.uclid.UclidScheduleGenerator;
 import org.lflang.lf.Action;
 import org.lflang.lf.ActionOrigin;
 import org.lflang.lf.Expression;
@@ -571,26 +572,15 @@ public class CGenerator extends GeneratorBase {
                 Exceptions.sneakyThrow(e);
             }
 
+            // Generate scheduler-specific code. In the case of the QS scheduler,
+            // a schedule.h is generated. This is separated from the logic in
+            // pickScheduler(), since pickScheduler() does not generate new code.
+            generateCodeForScheduler();
+
             // Create docker file.
             if (targetConfig.dockerOptions != null && mainDef != null) {
                 dockerGenerator.addFile(
                     dockerGenerator.fromData(lfModuleName, federate.name, fileConfig));
-            }
-
-            System.out.println("Checking main instance in CGenerator.java.");
-            System.out.println(this.main);
-            System.out.println(main);
-
-            // Generate schedule.h if QS scheduler is used.
-            if (targetConfig.schedulerType == SchedulerOption.QS) {
-                var scheduleGenerator = new SmtScheduleGenerator(fileConfig, errorReporter, main, targetConfig);
-                var scheduleFile = fileConfig.getSrcGenPath() + File.separator + "schedule.h";
-                var scheduleCode = scheduleGenerator.generateScheduleCode();
-                try {
-                    scheduleCode.writeToFile(scheduleFile);
-                } catch (IOException e) {
-                    Exceptions.sneakyThrow(e);
-                }
             }
 
             if (targetConfig.useCmake) {
@@ -882,6 +872,25 @@ public class CGenerator extends GeneratorBase {
         }
     }
 
+    /**
+     * Generate scheduler-specific code. In the case of the QS scheduler,
+     * a schedule.h is generated. This is separated from the logic in
+     * pickScheduler(), since pickScheduler() does not generate new code.
+     */
+    private void generateCodeForScheduler() {
+        // Generate schedule.h if QS scheduler is used.
+        if (targetConfig.schedulerType == SchedulerOption.QS) {
+            var scheduleGenerator = new UclidScheduleGenerator(fileConfig, errorReporter, main, targetConfig);
+            var scheduleFile = fileConfig.getSrcGenPath() + File.separator + "schedule.h";
+            var scheduleCode = scheduleGenerator.generateScheduleCode();
+            try {
+                scheduleCode.writeToFile(scheduleFile);
+            } catch (IOException e) {
+                Exceptions.sneakyThrow(e);
+            }
+        }
+    }
+
     protected CDockerGenerator getDockerGenerator() {
         return new CDockerGenerator(isFederated, CCppMode, targetConfig);
     }
@@ -924,6 +933,22 @@ public class CGenerator extends GeneratorBase {
         targetConfig.compileAdditionalSources.add(
             "core" + File.separator + "utils" + File.separator + "semaphore.c"
         );
+
+        // Perform a set of QS scheduler-specific operations.
+        if (targetConfig.schedulerType == SchedulerOption.QS) {
+            // Define a macro in CMake.
+            targetConfig.compileDefinitions.put("SCHEDULER_QS", "");
+            // Copy an additional header file for QS.
+            try {
+                FileUtil.copyFilesFromClassPath(
+                    "/lib/c/reactor-c/core",
+                    fileConfig.getSrcGenPath().resolve("core"),
+                    List.of("threaded/scheduler_QS.h")
+                );
+            } catch (IOException e) {
+                Exceptions.sneakyThrow(e);
+            }
+        }            
     }
 
     private boolean hasDeadlines(List<Reactor> reactors) {

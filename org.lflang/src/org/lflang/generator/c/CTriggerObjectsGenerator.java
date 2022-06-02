@@ -162,14 +162,8 @@ public class CTriggerObjectsGenerator {
             isFederated,
             clockSyncIsOn
         ));
-        if (targetConfig.schedulerType == SchedulerOption.QS) {
-            code.pr(generateReactionInstanceList( 
-                federate, 
-                main,
-                isFederated
-            ));
-        }
         code.pr(generateSchedulerInitializer(
+            federate,
             main,
             targetConfig
         ));
@@ -181,6 +175,7 @@ public class CTriggerObjectsGenerator {
     * Generate code to initialize the scheduler for the threaded C runtime.
     */
     public static String generateSchedulerInitializer(
+        FederateInstance federate,
         ReactorInstance main,
         TargetConfig targetConfig
     ) {
@@ -192,6 +187,16 @@ public class CTriggerObjectsGenerator {
         var numReactionsPerLevelJoined = Arrays.stream(numReactionsPerLevel)
                 .map(String::valueOf)
                 .collect(Collectors.joining(", "));
+        // Generate a list of reaction runtime instances.
+        // This is currently useful for QS, but could be
+        // utilized by other schedulers in the future.
+        if (targetConfig.schedulerType == SchedulerOption.QS) {
+            code.pr(generateReactionInstanceList( 
+                federate, 
+                main
+            ));
+        }
+        // Print the initializers.
         code.pr(String.join("\n",
             "// Initialize the scheduler",
             "size_t num_reactions_per_level["+numReactionsPerLevel.length+"] = ",
@@ -436,47 +441,41 @@ public class CTriggerObjectsGenerator {
         }
         return foundOne;
     }
-private static String generateReactionInstanceList(        
-    FederateInstance currentFederate,
-        ReactorInstance reactor,
-        boolean isFederated) {
-    var code = new CodeBuilder();
-    // var numReactionsPerLevel = reactor.assignLevels().getNumReactionsPerLevel();
-    code.pr( "reaction_t **_lf_reaction_instances = (reaction_t**) calloc("+reactionNum+", sizeof(reaction_t*));");
-    generateReactionInstances(currentFederate,reactor, isFederated, code);
-    return code.toString();
-}
-private static void generateReactionInstances(
+    private static String generateReactionInstanceList(        
+        FederateInstance currentFederate,
+        ReactorInstance reactor) {
+        var code = new CodeBuilder();
+        code.pr( "reaction_t **_lf_reaction_instances = (reaction_t**) calloc("+reactionNum+", sizeof(reaction_t*));");
+        generateReactionInstances(currentFederate, reactor, code);
+        return code.toString();
+    }
+    private static void generateReactionInstances(
         FederateInstance currentFederate,
         ReactorInstance reactor,
-        boolean isFederated,
         CodeBuilder code
     ){
-        //FIXME: CHECK WHETHER THE PARENT OF REACTOR IS BANK
-        if (reactor != null && (reactor.isBank()||(reactor.getParent() != null&& reactor.getParent().isBank()))) {
-         //if(reactor != null && reactor.isBank()){
+        if (reactor != null && 
+            (reactor.isBank() || (reactor.getParent() != null && reactor.getParent().isBank()))) {
             for (ReactionInstance r : reactor.reactions) {
                 List<Runtime> runtimes = r.getRuntimeInstances();
-            
                 for (Runtime rt :runtimes) {
                     code.pr(String.join("", "_lf_reaction_instances["+reactionId+"] = ", "&", CUtil.reactionRef(rt.getReaction(), Integer.toString(rt.id)), ";"));
                     rt.reactionID = reactionId;
-                    reactionId +=1;
+                    reactionId += 1;
                 }
             }
-        }else{
+        } else {
             for (ReactionInstance r : reactor.reactions) {
                 code.pr(String.join("", "_lf_reaction_instances["+reactionId+"] = ", "&", CUtil.reactionRef(r), ";"));
                 for(Runtime rt: r.getRuntimeInstances()){
                     rt.reactionID = reactionId;
-                    reactionId +=1;
+                    reactionId += 1;
                 }
             }
         }
-        
-         for (ReactorInstance child : reactor.children) {
+        for (ReactorInstance child : reactor.children) {
             if (currentFederate.contains(child)) {
-                 generateReactionInstances(currentFederate, child, isFederated, code);
+                 generateReactionInstances(currentFederate, child, code);
             }
         }
     }
