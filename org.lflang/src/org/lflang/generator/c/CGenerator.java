@@ -1537,15 +1537,15 @@ public class CGenerator extends GeneratorBase {
     public void generateReaction(Reaction reaction, ReactorDecl decl, int reactionIndex) {
         if (reaction.getLet() != null) {
             code.pr(CReactionGenerator.generateLETReaction(
-                    reaction,
-                    decl,
-                    reactionIndex,
-                    mainDef,
-                    errorReporter,
-                    types,
-                    isFederatedAndDecentralized(),
-                    getTarget().requiresTypes
-                ));
+                reaction,
+                decl,
+                reactionIndex,
+                mainDef,
+                errorReporter,
+                types,
+                isFederatedAndDecentralized(),
+                getTarget().requiresTypes
+            ));
         } else {
             code.pr(CReactionGenerator.generateReaction(
                 reaction,

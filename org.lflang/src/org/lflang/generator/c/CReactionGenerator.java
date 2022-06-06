@@ -1272,6 +1272,8 @@ public class CReactionGenerator {
         // Generate the first reaction, which causes the above thread to begin work.
         functionName = generateReactionFunctionName(decl, reactionIndex);
         
+        // FIXME: The above should be a method, not a reaction.
+        // Need to implement methods first.
         
         // Now generate code for the late function, if there is one
         // Note that this function can only be defined on reactions
@@ -1294,25 +1296,6 @@ public class CReactionGenerator {
         return code.toString();
     }
     
-    /**
-     * Return a function definition for a thread function that will
-     * perform the work of executing a LET reaction with the specified index.
-     * @param decl The reactor declaration.
-     * @param reactionIndex The index of the LET reaction.
-     * @return A function definition.
-     */
-    private static String generateLETThreadFunction(ReactorDecl decl, int reactionIndex) {
-        String functionName = generateLETReactionFunctionName(decl, reactionIndex);
-        var function = new CodeBuilder();
-        function.pr("void* " + functionName + "_thread (void* instance_args) {");
-        function.indent();
-        function.pr(functionName + "(instance_args);");
-        function.pr("return NULL;");
-        function.unindent();
-        function.pr("}");
-        return function.toString();
-   }
-
     public static String generateFunction(String header, String init, Code code) {
         var function = new CodeBuilder();
         function.pr(header + " {");
@@ -1397,4 +1380,23 @@ public class CReactionGenerator {
     private static String generateFunctionHeader(String functionName) {
         return "void " + functionName + "(void* instance_args)";
     }
+
+    /**
+     * Return a function definition for a thread function that will
+     * perform the work of executing a LET reaction with the specified index.
+     * @param decl The reactor declaration.
+     * @param reactionIndex The index of the LET reaction.
+     * @return A function definition.
+     */
+    private static String generateLETThreadFunction(ReactorDecl decl, int reactionIndex) {
+        String functionName = generateLETReactionFunctionName(decl, reactionIndex);
+        var function = new CodeBuilder();
+        function.pr("void* " + functionName + "_thread (void* instance_args) {");
+        function.indent();
+        function.pr(functionName + "(instance_args);");
+        function.pr("return NULL;");
+        function.unindent();
+        function.pr("}");
+        return function.toString();
+   }
 }
