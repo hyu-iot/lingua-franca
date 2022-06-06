@@ -1,0 +1,23 @@
+target C;
+reactor LET {
+    input in:int;
+    output out:int;
+    state v:int(0);
+    reaction(in) -> out after 10 msec {=
+        lf_set(out, in->value);
+        self->v += 1;
+    =}
+}
+main reactor {
+    let = new LET();
+    physical action a;
+    timer t(0, 10 msec);
+    reaction(t) -> let.in {=
+        lf_set(let.in, 42);
+    =}
+    reaction(let.out) {=
+        lf_print("Received %d at time %lld.",
+            let.out->value, lf_time_logical_elapsed()
+        );
+    =}
+}
