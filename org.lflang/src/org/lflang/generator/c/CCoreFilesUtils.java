@@ -46,6 +46,10 @@ public class CCoreFilesUtils {
         return "include/ctarget/set.h";
     }
 
+    public static String getCTargetSetLetHeader() {
+        return "include/ctarget/set_let.h";
+    }
+
     public static String getCTargetSetUndefHeader() {
         return "include/ctarget/set_undef.h";
     }
