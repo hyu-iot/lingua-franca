@@ -1161,13 +1161,19 @@ public class CReactionGenerator {
         );
     }
 
-    /** Generate a reaction function definition for a reactor.
-     *  This function will have a single argument that is a void* pointing to
-     *  a struct that contains parameters, state variables, inputs (triggering or not),
-     *  actions (triggering or produced), and outputs.
-     *  @param reaction The reaction.
-     *  @param reactor The reactor.
-     *  @param reactionIndex The position of the reaction within the reactor.
+    /** 
+     * Generate a reaction function definition for a reactor.
+     * This function will have a single argument that is a void* pointing to
+     * a self struct that contains parameters, state variables, inputs (triggering or not),
+     * actions (triggering or produced), and outputs.
+     * @param reaction The reaction.
+     * @param reactor The reactor.
+     * @param reactionIndex The position of the reaction within the reactor.
+     * @param mainDef The top-level reactor.
+     * @param errorReporter An error reporter.
+     * @param types The target language types.
+     * @param isFederatedAndDecentralized Indicator of federated with decentralized coordination.
+     * @param requiresType Indicator that the target requires types (should always be true).
      */
     public static String generateReaction(
         Reaction reaction,
@@ -1215,6 +1221,98 @@ public class CReactionGenerator {
         return code.toString();
     }
 
+    /** 
+     * Generate two reaction functions for the start and end of a
+     * logical execution time (LET) reaction plus the functions to be executed
+     * in a separate thread to do the actual work.
+     * Each function will have a single argument that is a void* pointing to
+     * a self struct that contains parameters, state variables, inputs (triggering or not),
+     * actions (triggering or produced), and outputs.
+     * @param reaction The reaction.
+     * @param reactor The reactor.
+     * @param reactionIndex The position of the reaction within the reactor.
+     * @param mainDef The top-level reactor.
+     * @param errorReporter An error reporter.
+     * @param types The target language types.
+     * @param isFederatedAndDecentralized Indicator of federated with decentralized coordination.
+     * @param requiresType Indicator that the target requires types (should always be true).
+     */
+    public static String generateLETReaction(
+        Reaction reaction,
+        ReactorDecl decl,
+        int reactionIndex,
+        Instantiation mainDef,
+        ErrorReporter errorReporter,
+        CTypes types,
+        boolean isFederatedAndDecentralized,
+        boolean requiresType
+    ) {
+        var code = new CodeBuilder();
+        var body = ASTUtils.toText(reaction.getCode());
+        String init = generateInitializationForReaction(
+                        body, reaction, decl, reactionIndex,
+                        types, errorReporter, mainDef,
+                        isFederatedAndDecentralized,
+                        requiresType);
+        code.pr(
+            "#include " + StringUtil.addDoubleQuotes(
+                CCoreFilesUtils.getCTargetSetLetHeader()));
+        
+        // Function that will be invoked in a separate thread.
+        String functionName = generateLETReactionFunctionName(decl, reactionIndex);
+        code.pr(generateFunction(
+            generateFunctionHeader(functionName),
+            init, 
+            reaction.getCode()
+        ));
+        
+        // Generate the thread function that calls the above function.
+        code.pr(generateLETThreadFunction(decl, reactionIndex));
+        
+        // Generate the first reaction, which causes the above thread to begin work.
+        functionName = generateReactionFunctionName(decl, reactionIndex);
+        
+        
+        // Now generate code for the late function, if there is one
+        // Note that this function can only be defined on reactions
+        // in federates that have inputs from a logical connection.
+        if (reaction.getStp() != null) {
+            code.pr(generateFunction(
+                generateStpFunctionHeader(decl, reactionIndex),
+                init, reaction.getStp().getCode()));
+        }
+
+        // Now generate code for the deadline violation function, if there is one.
+        if (reaction.getDeadline() != null) {
+            code.pr(generateFunction(
+                generateDeadlineFunctionHeader(decl, reactionIndex),
+                init, reaction.getDeadline().getCode()));
+        }
+        code.pr(
+            "#include " + StringUtil.addDoubleQuotes(
+                CCoreFilesUtils.getCTargetSetUndefHeader()));
+        return code.toString();
+    }
+    
+    /**
+     * Return a function definition for a thread function that will
+     * perform the work of executing a LET reaction with the specified index.
+     * @param decl The reactor declaration.
+     * @param reactionIndex The index of the LET reaction.
+     * @return A function definition.
+     */
+    private static String generateLETThreadFunction(ReactorDecl decl, int reactionIndex) {
+        String functionName = generateLETReactionFunctionName(decl, reactionIndex);
+        var function = new CodeBuilder();
+        function.pr("void* " + functionName + "_thread (void* instance_args) {");
+        function.indent();
+        function.pr(functionName + "(instance_args);");
+        function.pr("return NULL;");
+        function.unindent();
+        function.pr("}");
+        return function.toString();
+   }
+
     public static String generateFunction(String header, String init, Code code) {
         var function = new CodeBuilder();
         function.pr(header + " {");
@@ -1245,6 +1343,18 @@ public class CReactionGenerator {
      */
     public static String generateReactionFunctionName(ReactorDecl reactor, int reactionIndex) {
         return reactor.getName().toLowerCase() + "reaction_function_" + reactionIndex;
+    }
+
+    /**
+     * Return the function name for specified LET function of the
+     * specified reactor. This is the function that will be invoked in
+     * a separate thread.
+     * @param reactor The reactor
+     * @param reactionIndex The reaction index.
+     * @return The function name for the reaction.
+     */
+    public static String generateLETReactionFunctionName(ReactorDecl reactor, int reactionIndex) {
+        return reactor.getName().toLowerCase() + "reaction_function_" + reactionIndex + "__let";
     }
 
     /**

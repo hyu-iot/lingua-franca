@@ -25,6 +25,18 @@ THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***************/
 
 package org.lflang.generator.c;
+import static org.lflang.ASTUtils.allActions;
+import static org.lflang.ASTUtils.allInputs;
+import static org.lflang.ASTUtils.allOutputs;
+import static org.lflang.ASTUtils.allReactions;
+import static org.lflang.ASTUtils.allStateVars;
+import static org.lflang.ASTUtils.convertToEmptyListIfNull;
+import static org.lflang.ASTUtils.getInferredType;
+import static org.lflang.ASTUtils.isInitialized;
+import static org.lflang.ASTUtils.toDefinition;
+import static org.lflang.ASTUtils.toText;
+import static org.lflang.util.StringUtil.addDoubleQuotes;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -34,18 +46,17 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-import com.google.common.base.Objects;
-import com.google.common.collect.Iterables;
+
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.xtext.util.CancelIndicator;
 import org.eclipse.xtext.xbase.lib.Exceptions;
 import org.eclipse.xtext.xbase.lib.IterableExtensions;
 import org.eclipse.xtext.xbase.lib.IteratorExtensions;
 import org.eclipse.xtext.xbase.lib.StringExtensions;
+import org.lflang.ASTUtils;
 import org.lflang.ErrorReporter;
 import org.lflang.FileConfig;
 import org.lflang.InferredType;
-import org.lflang.ASTUtils;
 import org.lflang.Target;
 import org.lflang.TargetConfig;
 import org.lflang.TargetProperty;
@@ -60,10 +71,9 @@ import org.lflang.federated.serialization.SupportedSerializers;
 import org.lflang.generator.ActionInstance;
 import org.lflang.generator.CodeBuilder;
 import org.lflang.generator.GeneratorBase;
-import org.lflang.generator.DockerGeneratorBase;
 import org.lflang.generator.GeneratorResult;
-import org.lflang.generator.IntegratedBuilder;
 import org.lflang.generator.GeneratorUtils;
+import org.lflang.generator.IntegratedBuilder;
 import org.lflang.generator.LFGeneratorContext;
 import org.lflang.generator.LFResource;
 import org.lflang.generator.ParameterInstance;
@@ -92,8 +102,9 @@ import org.lflang.lf.VarRef;
 import org.lflang.lf.Variable;
 import org.lflang.lf.WidthTerm;
 import org.lflang.util.FileUtil;
-import static org.lflang.ASTUtils.*;
-import static org.lflang.util.StringUtil.*;
+
+import com.google.common.base.Objects;
+import com.google.common.collect.Iterables;
 
 /**
  * Generator for C target. This class generates C code defining each reactor
@@ -1513,25 +1524,40 @@ public class CGenerator extends GeneratorBase {
         }
     }
 
-    /** Generate a reaction function definition for a reactor.
-     *  This function will have a single argument that is a void* pointing to
-     *  a struct that contains parameters, state variables, inputs (triggering or not),
-     *  actions (triggering or produced), and outputs.
-     *  @param reaction The reaction.
-     *  @param reactor The reactor.
-     *  @param reactionIndex The position of the reaction within the reactor.
+    /** 
+     * Generate a reaction function definition for a reactor, or, if it a LET reaction,
+     * two reaction functions and supporting functions to execute in a thread.
+     * The generated function will have a single argument that is a void* pointing to
+     * a self struct that contains parameters, state variables, inputs (triggering or not),
+     * actions (triggering or produced), and outputs.
+     * @param reaction The reaction.
+     * @param reactor The reactor.
+     * @param reactionIndex The position of the reaction within the reactor.
      */
     public void generateReaction(Reaction reaction, ReactorDecl decl, int reactionIndex) {
-        code.pr(CReactionGenerator.generateReaction(
-            reaction,
-            decl,
-            reactionIndex,
-            mainDef,
-            errorReporter,
-            types,
-            isFederatedAndDecentralized(),
-            getTarget().requiresTypes
-        ));
+        if (reaction.getLet() != null) {
+            code.pr(CReactionGenerator.generateLETReaction(
+                    reaction,
+                    decl,
+                    reactionIndex,
+                    mainDef,
+                    errorReporter,
+                    types,
+                    isFederatedAndDecentralized(),
+                    getTarget().requiresTypes
+                ));
+        } else {
+            code.pr(CReactionGenerator.generateReaction(
+                reaction,
+                decl,
+                reactionIndex,
+                mainDef,
+                errorReporter,
+                types,
+                isFederatedAndDecentralized(),
+                getTarget().requiresTypes
+            ));
+        }
     }
 
     /**
