@@ -4,7 +4,7 @@ reactor LET {
     output out:int;
     state v:int(0);
     reaction(in) -> out after 10 msec {=
-        lf_set(out, in->value);  /// Takes 8 ms to execute.
+        lf_set(out, in->value);
         self->v += 1;
     =}
 }

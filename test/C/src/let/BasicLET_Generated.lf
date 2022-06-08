@@ -1,0 +1,117 @@
+target C {
+    // logging: DEBUG
+}
+// FIXME: Meaning of deadlines.
+// FIXME: Set the executing_reaction field so that _lf_check_deadline works.
+
+reactor LET {
+    input in:int;
+    output out:int;
+    state v:int(0);
+    
+    // Generated action for expiration of a LET time period.
+    logical action let__expires;
+    
+    // Generated action for each effect of a LET reaction:
+    logical action out__let:int;
+    
+    // Generated state variable.
+    state let_thread:lf_thread_t({=NULL=});
+    
+    // Reaction is split into a method and three reactions by the code generator.
+    
+    // This method does the work and instead of writing to outputs, schedules actions:
+    method let_0():void* {=
+        // Generated header:
+        let_in_t* in = self->_lf_in;
+        int in_width = self->_lf_in_width;
+        
+        // *** body of the reaction:
+        // Replace:
+        //      lf_set(out, in->value);
+        // with:
+        lf_schedule_int(&self->_lf_out__let, MSEC(10), in->value);
+        // FIXME: How to make the above type independent???
+        self->v += 1;
+        
+        // Generated return statement.
+        // FIXME: Will get a warning if user code has a return in it.
+        // Probably need instead a worker thread function.
+        return NULL;
+    =}
+    
+    // The first reaction joins the thread if it is still executing.
+    // This prevents progress for anything that depends on the outputs
+    // at the logical time of completion of the LET function.
+    reaction(let__expires) {=
+        void* thread_returns;
+        if (self->let_thread != NULL && lf_thread_join(self->let_thread, &thread_returns)) {
+            lf_print_error_and_exit("Failed to join LET thread (0)!");
+        }
+        self->let_thread = NULL;
+    =}
+    
+    // The second reaction writes the outputs.
+    // This needs to appear before the reaction to the inputs, which
+    // may start a new LET reaction executing. This allows feedback
+    // loops where an output from a LET reaction is fed back to
+    // trigger another execution of the LET reaction.
+    // Here, the triggers are the modified effects of the original
+    // and the effects are copied from the original.
+    reaction(out__let) -> out {=
+        void* thread_returns;
+        if (self->let_thread != NULL && lf_thread_join(self->let_thread, &thread_returns)) {
+            lf_print_error_and_exit("Failed to join LET thread (1)!");
+        }
+        // Generated code to copy the output.
+        if (out__let->is_present) {
+            // if (out__let->token != NULL) {
+                // FIXME: Bug? lf_set_token doesn't seem to work with actions.
+                // lf_set_token(out, out__let->token);
+            // } else {
+                lf_set(out, out__let->value);
+            // }
+        }        
+    =}
+    
+    // The second reaction reads the inputs and starts the thread.
+    // Here, the triggers are copied from the original and the effects
+    // are modified from the original.
+    reaction(in) -> let__expires, out__let {=        
+        // Schedule the termination reaction.
+        lf_schedule(let__expires, MSEC(10));
+        
+        // If the thread is still running, then we have overlapping
+        // LET functions. Join the thread. Note that the previous
+        // thread will not have _logically_ completed yet, but it
+        // has to have _physically_ completed so that we don't get
+        // race conditions with simultaneously running threads.
+        // Note that ALL reactions, even non-LET reactions, of this
+        // reactor need to do this.
+        // Note further that the updates to state variables appear
+        // logically instantaneous.
+        void* thread_returns;
+        if (self->let_thread != NULL && lf_thread_join(self->let_thread, &thread_returns)) {
+            lf_print_error_and_exit("Failed to join LET thread (2)!");
+        }
+        self->let_thread = NULL;
+
+        // Start the execution in a new thread.
+        // The function name is the method name returned by
+        // CMethodGenerator.methodFunctionName().
+        if (lf_thread_create(&self->let_thread, let_method_let_0, self)) {
+            lf_print_error_and_exit("Failed to create LET thread!");
+        }
+    =}
+}
+main reactor {
+    let = new LET();
+    reaction(startup) -> let.in {=
+        lf_set(let.in, 42);
+    =}
+    reaction(let.out) {=
+        lf_print("-------------- Received %d at time %lld.",
+            let.out->value, lf_time_logical_elapsed()
+        );
+    =}
+}
