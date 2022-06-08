@@ -10,10 +10,10 @@ reactor LET {
     state v:int(0);
     
     // Generated action for expiration of a LET time period.
-    logical action let__expires;
+    logical action let__expires(10 msec);
     
     // Generated action for each effect of a LET reaction:
-    logical action out__let:int;
+    logical action out__let(10 msec):int;
     
     // Generated state variable.
     state let_thread:lf_thread_t({=NULL=});
@@ -29,8 +29,9 @@ reactor LET {
         // *** body of the reaction:
         // Replace:
         //      lf_set(out, in->value);
-        // with:
-        lf_schedule_int(&self->_lf_out__let, MSEC(10), in->value);
+        // with the output of
+        // CReactionGenerator.generateDelayBody(String ref, String actionName, boolean isTokenType)
+        lf_schedule_copy(&self->_lf_out__let, 0, &in->value, 1);
         // FIXME: How to make the above type independent???
         self->v += 1;
         
@@ -65,21 +66,19 @@ reactor LET {
         }
         // Generated code to copy the output.
         if (out__let->is_present) {
-            // if (out__let->token != NULL) {
-                // FIXME: Bug? lf_set_token doesn't seem to work with actions.
-                // lf_set_token(out, out__let->token);
-            // } else {
-                lf_set(out, out__let->value);
-            // }
+            // Use CReactionGenerator.generateForwardBody(String outputName,
+            // String targetType, String actionName, boolean isTokenType) here.
+            // The following will only work with primitive types.
+            lf_set(out, out__let->value);
         }        
     =}
     
     // The second reaction reads the inputs and starts the thread.
     // Here, the triggers are copied from the original and the effects
-    // are modified from the original.
+    // are modified from the original (with let__expires added to effects).
     reaction(in) -> let__expires, out__let {=        
         // Schedule the termination reaction.
-        lf_schedule(let__expires, MSEC(10));
+        lf_schedule(let__expires, 0);
         
         // If the thread is still running, then we have overlapping
         // LET functions. Join the thread. Note that the previous
