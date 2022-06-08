@@ -4,7 +4,7 @@ reactor LET {
     output out:int;
     state v:int(0);
     reaction(in) -> out after 10 msec {=
-        lf_set(out, in->value);
+        lf_set(out, in->value);  /// Takes 8 ms to execute.
         self->v += 1;
     =}
 }
@@ -12,6 +12,8 @@ main reactor {
     let = new LET();
     physical action a;
     timer t(0, 10 msec);
+    timer g(0, 1 msec);
+    reaction(g) {==} deadline(2 ms) {==}
     reaction(t) -> let.in {=
         lf_set(let.in, 42);
     =}
