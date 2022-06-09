@@ -32,7 +32,11 @@ reactor LET {
         // with the output of
         // CReactionGenerator.generateDelayBody(String ref, String actionName, boolean isTokenType)
         lf_schedule_copy(&self->_lf_out__let, 0, &in->value, 1);
-        // FIXME: How to make the above type independent???
+        // FIXME: How to do such a replacement in target code???
+        // One possibility: create shadow outputs on the self struct and modify
+        // lf_set and related macros to write to the shadow.
+        // Then create a worker thread function that uses generateDelayBody
+        // to send those shadow outputs to actions.
         self->v += 1;
         
         // Generated return statement.
