@@ -1,5 +1,37 @@
 # Changelog
  
+## [v0.3.0](https://github.com/lf-lang/lingua-franca/tree/v0.3.0) (2022-07-01)
+
+**Highlights:**
+
+
+
+[Full Changelog](https://github.com/lf-lang/lingua-franca/compare/v0.2.1...v0.3.0)
+
+**Implemented enhancements:**
+
+- Minor issues with the syntax of modal reactors [\#1220](https://github.com/lf-lang/lingua-franca/issues/1220)
+- Minor issues with diagrams of modal reactors [\#1219](https://github.com/lf-lang/lingua-franca/issues/1219)
+- Smarter default number of threads [\#1096](https://github.com/lf-lang/lingua-franca/issues/1096)
+- startup reactions in modal models [\#999](https://github.com/lf-lang/lingua-franca/issues/999)
+
+**Fixed bugs:**
+
+- Master does not build under Eclipse [\#1258](https://github.com/lf-lang/lingua-franca/issues/1258)
+- Unexpected behavior when running `lfc` if the absolute path to the executable contains spaces [\#1256](https://github.com/lf-lang/lingua-franca/issues/1256)
+- Epoch welcome page points to wiki, not to web page [\#1237](https://github.com/lf-lang/lingua-franca/issues/1237)
+- Deadline of 0 is interpreted as no deadline [\#1203](https://github.com/lf-lang/lingua-franca/issues/1203)
+- Tracing C test fails randomly in CI [\#630](https://github.com/lf-lang/lingua-franca/issues/630)
+- Test framework does not capture output from all federates [\#363](https://github.com/lf-lang/lingua-franca/issues/363)
+
+**Closed issues:**
+
+- \[Federated\] Combination of broadcast, banks, and multiports causes a compile error only under decentralized coordination [\#1250](https://github.com/lf-lang/lingua-franca/issues/1250)
+- Error when running ./gradlew runLfc \(Could not determine the dependencies\) [\#1233](https://github.com/lf-lang/lingua-franca/issues/1233)
+- unistd.h is included inside the reactor namespace making the functions only available inside that namespace [\#1214](https://github.com/lf-lang/lingua-franca/issues/1214)
+- \[Modal models\] Validator needs to check for reactions triggered by `shutdown` inside of modes [\#1048](https://github.com/lf-lang/lingua-franca/issues/1048)
+- Address comments made in code review of \#406 [\#503](https://github.com/lf-lang/lingua-franca/issues/503)
+ 
 ## [v0.2.1](https://github.com/lf-lang/lingua-franca/tree/v0.2.1) (2022-06-01)
 
 **Highlights:**
