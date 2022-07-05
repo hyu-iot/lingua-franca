@@ -28,6 +28,7 @@ package org.lflang.generator.uclid;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -397,12 +398,19 @@ public class UclidScheduleGenerator {
         );
         cmdCompileUclid.run();
 
-        // Load the generated file into a string
-        String smtFile = tempFolder + File.separator
-            + "smt-property_prop-v-0001.smt";
+        // List .smt files in the directory.
+        File dir = new File(tempFolder);
+        File [] smtFiles = dir.listFiles(new FilenameFilter() {
+            @Override
+            public boolean accept(File dir, String name) {
+                return name.endsWith(".smt");
+            }
+        });
+        // Assuming that there is only 1 .smt file in the directory.
+        // Load the generated file into a string.
         String smtStr = "";
         try {
-            smtStr = Files.readString(Paths.get(smtFile), StandardCharsets.US_ASCII);
+            smtStr = Files.readString(Paths.get(smtFiles[0].getAbsolutePath()), StandardCharsets.US_ASCII);
         } catch (IOException e) {
             Exceptions.sneakyThrow(e);
         }
@@ -427,7 +435,7 @@ public class UclidScheduleGenerator {
         var smtCode = new CodeBuilder();
         smtCode.pr(smtStr);
         try {
-            smtCode.writeToFile(smtFile);
+            smtCode.writeToFile(smtFiles[0].getAbsolutePath());
         } catch (IOException e) {
             Exceptions.sneakyThrow(e);
         }
@@ -436,7 +444,7 @@ public class UclidScheduleGenerator {
         // Run Z3 on the printed SMT file.
         StringBuilder sb = new StringBuilder();
         try {
-            ProcessBuilder pb = new ProcessBuilder("z3", smtFile);
+            ProcessBuilder pb = new ProcessBuilder("z3", smtFiles[0].getAbsolutePath());
             final Process p=pb.start();
             BufferedReader br=new BufferedReader(new InputStreamReader(p.getInputStream()));
             String line;
