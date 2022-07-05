@@ -1113,7 +1113,11 @@ public class CReactionGenerator {
         }
 
         // Now generate code for the deadline violation function, if there is one.
+        if (reaction.getDeadline() != null) {
             code.pr(generateFunction(
+                generateDeadlineFunctionHeader(decl, reactionIndex),
+                init, reaction.getDeadline().getCode()));
+        }
         CMethodGenerator.generateMacroUndefsForMethods(ASTUtils.toDefinition(decl), code);
         code.pr(
             "#include " + StringUtil.addDoubleQuotes(

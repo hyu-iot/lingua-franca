@@ -64,6 +64,7 @@ import org.lflang.TargetProperty;
 import org.lflang.TargetProperty.ClockSyncMode;
 import org.lflang.TargetProperty.CoordinationType;
 import org.lflang.TargetProperty.Platform;
+import org.lflang.TargetProperty.SchedulerOption;
 import org.lflang.TimeValue;
 import org.lflang.federated.FedFileConfig;
 import org.lflang.federated.FederateInstance;
